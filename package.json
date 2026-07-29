@@ -1,0 +1,20 @@
+{
+	"name": "c41",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "vite build",
+		"watch": "vite build --watch --mode development"
+	},
+	"dependencies": {
+		"@bubblydoo/uxp-toolkit": "^0.0.21",
+		"zod": "^4.0.0"
+	},
+	"devDependencies": {
+		"@adobe-uxp-types/photoshop": "^0.1.8",
+		"@adobe-uxp-types/uxp": "^0.1.4",
+		"@bubblydoo/vite-uxp-plugin": "^0.0.5",
+		"typescript": "^5.8.3",
+		"vite": "^6.3.5"
+	}
+}
