@@ -2,6 +2,7 @@
 	"name": "c41",
 	"private": true,
 	"type": "module",
+	"license": "BSD-3-Clause",
 	"scripts": {
 		"build": "vite build",
 		"watch": "vite build --watch --mode development"

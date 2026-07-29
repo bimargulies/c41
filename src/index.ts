@@ -1,29 +1,61 @@
 import { entrypoints } from 'uxp';
 import { executeAsModal, createCommand } from '@bubblydoo/uxp-toolkit';
 import { z } from 'zod';
-import { app, imaging } from "adobe:photoshop";
+import { imaging } from "adobe:photoshop";
 
-async function getMaxChannelValues(): Promise<{ red: number; green: number; blue: number }> {
+console.log('[c41] plugin script evaluated');
+
+interface ChannelValues {
+	red: number;
+	green: number;
+	blue: number;
+}
+
+interface LimitValues {
+	min: ChannelValues;
+	max: ChannelValues;
+}
+
+async function getMaxChannelValues(): Promise<LimitValues> {
 	const { imageData } = await imaging.getPixels({ applyAlpha: true, componentSize: 8 });
 	try {
 		const data = (await imageData.getData({ chunky: true })) as Uint8Array;
-		let red = 0;
-		let green = 0;
-		let blue = 0;
+		let redMax = 0;
+		let greenMax = 0;
+		let blueMax = 0;
+
+		let redMin = 255;
+		let greenMin = 255;
+		let blueMin = 255;
+	
 		for (let i = 0; i < data.length; i += imageData.components) {
-			if (data[i] > red) red = data[i];
-			if (data[i + 1] > green) green = data[i + 1];
-			if (data[i + 2] > blue) blue = data[i + 2];
+			if (data[i] > redMax) redMax = data[i];
+			if (data[i + 1] > greenMax) greenMax = data[i + 1];
+			if (data[i + 2] > blueMax) blueMax = data[i + 2];
+			if (data[i] < redMin) redMin = data[i];
+			if (data[i + 1] < greenMin) greenMin = data[i + 1];
+			if (data[i + 2] < blueMin) blueMin = data[i + 2];
 		}
-		return { red, green, blue };
+		return { min: { red: redMin, green: greenMin, blue: blueMin }, max: { red: redMax, green: greenMax, blue: blueMax } };
 	} finally {
 		await imageData.dispose();
 	}
 }
 
-async function addLevelsAdjustmentLayer() {
-	const { red, green, blue } = await getMaxChannelValues();
+async function addC41AdjustmentLayers() {
+	console.log('[c41] addC41AdjustmentLayers: start');
+	try {
+		await addLevelsAndInvert();
+		console.log('[c41] addC41AdjustmentLayers: done');
+	} catch (err) {
+		console.error('[c41] addC41AdjustmentLayers: failed', err);
+	}
+}
+
+async function addLevelsAndInvert() {
 	await executeAsModal('Add C41 Adjustment Layers', async (executionContext) => {
+		const limits = await getMaxChannelValues();
+
 		const levelsCommand = createCommand({
 			modifying: true,
 			descriptor: {
@@ -45,7 +77,7 @@ async function addLevelsAdjustmentLayer() {
 									_enum: 'channel',
 									_value: 'red',
 								},
-								input: [0, red],
+								input: [limits.min.red, limits.max.red],
 								gamma: 1,
 								output: [0, 255],
 							},
@@ -56,7 +88,7 @@ async function addLevelsAdjustmentLayer() {
 									_enum: 'channel',
 									_value: 'green',
 								},
-								input: [0, green],
+								input: [limits.min.green, limits.max.green],
 								gamma: 1,
 								output: [0, 255],
 							},
@@ -67,7 +99,7 @@ async function addLevelsAdjustmentLayer() {
 									_enum: 'channel',
 									_value: 'blue',
 								},
-								input: [0, blue],
+								input: [limits.min.blue, limits.max.blue],
 								gamma: 1,
 								output: [0, 255],
 							},
@@ -101,6 +133,6 @@ async function addLevelsAdjustmentLayer() {
 // so the `setup()` config type incorrectly also demands the runtime API's members. Cast around it.
 entrypoints.setup({
 	commands: {
-		addLevelsAdjustmentLayer,
+		addC41AdjustmentLayers: addC41AdjustmentLayers,
 	},
 } as unknown as Parameters<typeof entrypoints.setup>[0]);

@@ -2,7 +2,7 @@ import type { UxpManifest } from '@bubblydoo/vite-uxp-plugin';
 
 export const manifest: UxpManifest = {
 	id: 'bimargulies.c41',
-	name: 'c41',
+	name: 'C41 tools',
 	version: '1.0.0',
 	main: 'index.js',
 	manifestVersion: 5,
@@ -18,7 +18,7 @@ export const manifest: UxpManifest = {
 	entrypoints: [
 		{
 			type: 'command',
-			id: 'addLevelsAdjustmentLayer',
+			id: 'addC41AdjustmentLayers',
 			label: {
 				default: 'Add C41 Adjustment Layers',
 			},
