@@ -1,7 +1,7 @@
 import type { UxpManifest } from '@bubblydoo/vite-uxp-plugin';
 
 export const manifest: UxpManifest = {
-	id: 'bimargulies.c41',
+	id: 'b7e22b3b',
 	name: 'C41 tools',
 	version: '1.0.0',
 	main: 'index.js',
