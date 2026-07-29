@@ -24,4 +24,20 @@ export const manifest: UxpManifest = {
 			},
 		},
 	],
+	icons: [
+		{
+			width: 23,
+			height: 23,
+			path: 'icons/plugin-dark.png',
+			scale: [1, 2],
+			theme: ['darkest', 'dark'],
+		},
+		{
+			width: 23,
+			height: 23,
+			path: 'icons/plugin-light.png',
+			scale: [1, 2],
+			theme: ['lightest', 'light'],
+		},
+	],
 };
