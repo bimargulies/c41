@@ -6,7 +6,8 @@
 	"packageManager": "pnpm@11.18.0",
 	"scripts": {
 		"build": "vite build",
-		"watch": "vite build --watch --mode development"
+		"watch": "vite build --watch --mode development",
+		"release": "node scripts/release.mjs"
 	},
 	"dependencies": {
 		"@bubblydoo/uxp-toolkit": "^0.0.21",
