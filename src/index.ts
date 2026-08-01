@@ -52,6 +52,23 @@ async function addC41AdjustmentLayers() {
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
   await executeAsModal("Add C41 Adjustment Layers", async (executionContext) => {
+	
+    const invertCommand = createCommand({
+      modifying: true,
+      descriptor: {
+        _obj: "make",
+        _target: [{ _ref: "adjustmentLayer" }],
+        using: {
+          _obj: "adjustmentLayer",
+          type: {
+            _obj: "invert",
+          },
+        },
+      },
+      schema: z.unknown(),
+    });
+    await executionContext.batchPlayCommand(invertCommand);
+
     let limits: AllLimitValues;
     if (prefs.useThreshold) {
       limits = await getLayerThresholdsFromHistograms(prefs.threshold);
@@ -116,21 +133,7 @@ async function addLevelsAndInvert() {
     });
     await executionContext.batchPlayCommand(levelsCommand);
 
-    const invertCommand = createCommand({
-      modifying: true,
-      descriptor: {
-        _obj: "make",
-        _target: [{ _ref: "adjustmentLayer" }],
-        using: {
-          _obj: "adjustmentLayer",
-          type: {
-            _obj: "invert",
-          },
-        },
-      },
-      schema: z.unknown(),
-    });
-    await executionContext.batchPlayCommand(invertCommand);
+
   });
 }
 
