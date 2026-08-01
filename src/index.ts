@@ -1,9 +1,23 @@
 import { entrypoints } from 'uxp';
 import { executeAsModal, createCommand } from '@bubblydoo/uxp-toolkit';
 import { z } from 'zod';
-import { imaging } from "adobe:photoshop";
+import { imaging, app } from "adobe:photoshop";
 
 console.log('[c41] plugin script evaluated');
+
+/** Cleaned up data format for your application logic */
+export interface ChannelHistogramData {
+    name: string;
+    histogram: number[];
+}
+
+/** Histograms (256-entry pixel counts) for each component channel (e.g. red, green, blue) of the active document. Channels must be visible. */
+export async function getChannelHistograms(): Promise<ChannelHistogramData[]> {
+	return app.activeDocument.componentChannels.map((channel) => ({
+		name: channel.name,
+		histogram: channel.histogram,
+	}));
+}
 
 interface ChannelValues {
 	red: number;
