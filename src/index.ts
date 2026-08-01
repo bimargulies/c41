@@ -2,6 +2,7 @@ import { entrypoints } from 'uxp';
 import { executeAsModal, createCommand } from '@bubblydoo/uxp-toolkit';
 import { z } from 'zod';
 import { imaging, app } from "adobe:photoshop";
+import { openC41Preferences } from './preferences';
 
 console.log('[c41] plugin script evaluated');
 
@@ -148,5 +149,6 @@ async function addLevelsAndInvert() {
 entrypoints.setup({
 	commands: {
 		addC41AdjustmentLayers: addC41AdjustmentLayers,
+		openC41Preferences: openC41Preferences,
 	},
 } as unknown as Parameters<typeof entrypoints.setup>[0]);

@@ -7,7 +7,8 @@
 	"scripts": {
 		"build": "vite build",
 		"watch": "vite build --watch --mode development",
-		"release": "node scripts/release.mjs"
+		"release": "node scripts/release.mjs",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@bubblydoo/uxp-toolkit": "^0.0.21",
@@ -17,7 +18,9 @@
 		"@adobe-uxp-types/photoshop": "^0.1.8",
 		"@adobe-uxp-types/uxp": "^0.1.4",
 		"@bubblydoo/vite-uxp-plugin": "^0.0.5",
+		"jsdom": "^30.0.1",
 		"typescript": "^5.8.3",
-		"vite": "^6.3.5"
+		"vite": "^6.3.5",
+		"vitest": "^4.1.10"
 	}
 }

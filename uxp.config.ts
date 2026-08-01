@@ -23,6 +23,13 @@ export const manifest: UxpManifest = {
 				default: 'Add C41 Adjustment Layers',
 			},
 		},
+		{
+			type: 'command',
+			id: 'openC41Preferences',
+			label: {
+				default: 'Preferences...',
+			},
+		},
 	],
 	icons: [
 		{
