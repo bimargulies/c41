@@ -11,3 +11,14 @@ interface HTMLDialogElement {
 	/** UXP-specific: shows the dialog modally, resolving with the value passed to `close()`. */
 	uxpShowModal(options?: UxpShowModalOptions): Promise<unknown>;
 }
+
+interface LimitValues {
+	min: number;
+	max: number;
+}
+
+interface AllLimitValues {
+	red: LimitValues;
+	green: LimitValues;
+	blue: LimitValues;
+}
