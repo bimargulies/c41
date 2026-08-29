@@ -9,7 +9,13 @@ export const manifest: UxpManifest = {
 	host: [
 		{
 			app: 'PS',
-			minVersion: '24.0.0',
+			// Keep this low. Creative Cloud's .ccx installer has a long-standing bug where a
+			// "real" minVersion (e.g. 24.0.0) is rejected as "no compatible version of
+			// Photoshop installed" even on much newer builds. The plugin still needs a
+			// modern Photoshop (UXP apiVersion 2 / manifestVersion 5 ~= PS 24.2+); that
+			// floor is enforced at runtime rather than by this gate.
+			// https://forums.creativeclouddeveloper.com/t/manifest-minversion-issue/2525
+			minVersion: '22.0.0',
 			data: {
 				apiVersion: 2,
 			},
