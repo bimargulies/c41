@@ -1,12 +1,14 @@
 const PREFERENCES_KEY = 'c41.preferences';
 
+export type LevelsMode = 'threshold' | 'extreme' | 'knee detection';
+
 export interface Preferences {
-	useThreshold: boolean;
+	detectionMethod: LevelsMode;
 	threshold: number;
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
-	useThreshold: false,
+	detectionMethod: 'extreme',
 	threshold: 0,
 };
 
@@ -58,17 +60,27 @@ export async function openC41Preferences() {
 		</style>
 		<form>
 			<h3 style="margin: 0">C41 Preferences</h3>
-			<label class="row">
-				<input type="checkbox" id="useThreshold" ${prefs.useThreshold ? "checked" : ""} />
+			<div class="row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+				<label class="row">
+					<input type="radio" name="levelsMode" id="modeThreshold" value="threshold" ${prefs.detectionMethod === "threshold" ? "checked" : ""} />
 					Set levels based on threshold.
-			</label>
+				</label>
+				<label class="row">
+					<input type="radio" name="levelsMode" id="modeExtreme" value="extreme" ${prefs.detectionMethod === "extreme" ? "checked" : ""} />
+					Set levels based on the darkest and lightest pixels.
+				</label>
+				<label class="row">
+					<input type="radio" name="levelsMode" id="modeKneeDetection" value="knee detection" ${prefs.detectionMethod === "knee detection" ? "checked" : ""} />
+					Set levels based on automatic knee detection.
+				</label>
+			</div>
 			<label class="row">
 				Threshold percentage (0-100):
 				<input type="number" id="threshold" min="0" max="100" required value="${prefs.threshold}" />
 			</label>
 			<div id="thresholdError" class="error"></div>
 			<label class="row">
-			    (If the threshold is disabled, levels will be set based on the darkest and lightest pixels in the image.)
+			    (Threshold percentage is only used when "threshold" is selected above.)
 			</label>
 			<div class="buttons">
 				<button id="cancelPreferences" type="button">Cancel</button>
@@ -83,16 +95,16 @@ export async function openC41Preferences() {
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.addEventListener('click', () => {
 			const thresholdInput = dialog.querySelector<HTMLInputElement>('#threshold')!;
 			const thresholdError = dialog.querySelector<HTMLDivElement>('#thresholdError')!;
+			const detectionMethod = dialog.querySelector<HTMLInputElement>('input[name="levelsMode"]:checked')!.value as LevelsMode;
 			const threshold = Number(thresholdInput.value);
 
-			if (thresholdInput.value.trim() === '' || !Number.isFinite(threshold) || threshold < 0 || threshold > 100) {
+			if (detectionMethod === 'threshold' && (thresholdInput.value.trim() === '' || !Number.isFinite(threshold) || threshold < 0 || threshold > 100)) {
 				thresholdError.textContent = 'Threshold must be a number between 0 and 100.';
 				return;
 			}
 			thresholdError.textContent = '';
 
-			const useThreshold = dialog.querySelector<HTMLInputElement>('#useThreshold')!.checked;
-			setPreferences({ useThreshold, threshold });
+			setPreferences({ detectionMethod, threshold: Number.isFinite(threshold) ? threshold : prefs.threshold });
 			dialog.close();
 		});
 

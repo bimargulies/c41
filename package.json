@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@bubblydoo/uxp-toolkit": "^0.0.21",
+		"ml-savitzky-golay": "^5.0.0",
 		"zod": "^4.0.0"
 	},
 	"devDependencies": {

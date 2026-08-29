@@ -3,7 +3,8 @@ import { executeAsModal, createCommand } from "@bubblydoo/uxp-toolkit";
 import { z } from "zod";
 import { imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
-import { getLayerThresholdsFromHistograms } from "./histogram";
+import { getLayerThresholdsFromHistograms, getLayerLimitsFromKnees } from "./histogram";
+import { writeChannelHistogramsFile } from "./exportHistograms";
 
 console.log("[c41] plugin script evaluated");
 
@@ -49,6 +50,16 @@ async function addC41AdjustmentLayers() {
   }
 }
 
+async function exportChannelHistograms() {
+  console.log("[c41] exportChannelHistograms: start");
+  try {
+    await writeChannelHistogramsFile();
+    console.log("[c41] exportChannelHistograms: done");
+  } catch (err) {
+    console.error("[c41] exportChannelHistograms: failed", err);
+  }
+}
+
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
   await executeAsModal("Add C41 Adjustment Layers", async (executionContext) => {
@@ -70,12 +81,20 @@ async function addLevelsAndInvert() {
     await executionContext.batchPlayCommand(invertCommand);
 
     let limits: AllLimitValues;
-    if (prefs.useThreshold) {
-      limits = await getLayerThresholdsFromHistograms(prefs.threshold);
-	  console.log("[c41] addC41AdjustmentLayers: using threshold", prefs.threshold, "limits:", limits);
-    } else {
-      limits = await gerChannelLimitValues();
-	  console.log("[c41] addC41AdjustmentLayers: using full range limits:", limits);
+    switch (prefs.detectionMethod) {
+      case "threshold":
+        limits = await getLayerThresholdsFromHistograms(prefs.threshold);
+        console.log("[c41] addC41AdjustmentLayers: using threshold", prefs.threshold, "limits:", limits);
+        break;
+      case "knee detection":
+        limits = await getLayerLimitsFromKnees();
+        console.log("[c41] addC41AdjustmentLayers: using knee detection, limits:", limits);
+        break;
+      case "extreme":
+      default:
+        limits = await gerChannelLimitValues();
+        console.log("[c41] addC41AdjustmentLayers: using full range limits:", limits);
+        break;
     }
 
     const levelsCommand = createCommand({
@@ -142,6 +161,7 @@ async function addLevelsAndInvert() {
 entrypoints.setup({
   commands: {
     addC41AdjustmentLayers: addC41AdjustmentLayers,
+    exportChannelHistograms: exportChannelHistograms,
     openC41Preferences: openC41Preferences,
   },
 } as unknown as Parameters<typeof entrypoints.setup>[0]);

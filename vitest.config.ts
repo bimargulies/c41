@@ -6,6 +6,7 @@ export default defineConfig({
 			// UXP-native modules only resolve inside the real UXP runtime; point them at stubs
 			// so Vite can resolve the import, then vi.mock() overrides the contents per test.
 			'adobe:photoshop': new URL('./test/stubs/adobe-photoshop.ts', import.meta.url).pathname,
+			'uxp': new URL('./test/stubs/uxp.ts', import.meta.url).pathname,
 		},
 	},
 	test: {
