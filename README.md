@@ -4,9 +4,8 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative
 film. Its one command, **Add C41 Adjustment Layers**, adds two adjustment
 layers to the active document:
 
-1. **Invert** — the top layer, flipping the negative into a positive. Because
-   it sits above Levels, it acts on the already channel-balanced image.
-2. **Levels** — directly below Invert. For each of the red, green, and blue
+1. **Invert** — the bottom layer, switching from negative to positive.
+2. **Levels** — directly above Invert. For each of the red, green, and blue
    channels, the input range is stretched to that channel's actual minimum
    and maximum pixel value in the image (an auto-contrast per channel). This
    cancels out the orange film-base mask and color cast typical of C-41
@@ -65,40 +64,35 @@ desktop app (5.7+) with an entitled Adobe ID.
 
 ### When `.ccx` installation fails
 
-Packaged installs currently fail on recent Photoshop / Creative Cloud builds,
-with either *"you do not have a compatible version of Photoshop installed"* or
-`Failed to install, status = -267!` (the agent's log spells this out as
-"Failed to generate mxi for uxp extension"). This is an Adobe-side
-regression in the Creative Cloud install backend, not a problem with this
-plugin's manifest or package:
+As of Photoshop 27.10 / Creative Cloud 6.10 (August 2026), packaged installs
+fail on this machine with `Failed to install, status = -267!`. The installer
+agent's own log (`~/Library/Application Support/Adobe/UPI/Log/EMCL.log`) gives
+the real reason:
 
-- A byte-for-byte identical `.ccx` that installed fine a few weeks earlier
-  now fails with the same error.
-- `scripts/install-macos.sh` does **not** get around it — the agent just
-  forwards the request to the Creative Cloud desktop app, which is where the
-  failure happens.
-- Loading the plugin through UDT (Developer Mode) is unaffected, because that
-  path doesn't go through Creative Cloud's install/validation at all.
+```
+uxp manifest file is invalid or fields missing
+Failed to generate mxi for uxp extension
+```
 
-Things that sometimes help:
+This is an Adobe-side regression, not a problem with this plugin:
 
-- Give **Full Disk Access** to the Creative Cloud desktop app and to
-  `/Library/Application Support/Adobe/Adobe Desktop Common/ADS/Adobe Desktop Service.app`,
-  then relaunch Creative Cloud; failing that, run **Repair** from the
-  Creative Cloud Uninstaller and reboot.
-- Put the `.ccx` in `~/Downloads` (same volume as Photoshop) before opening
-  it — the installer only searches the drive the file is on.
-- Otherwise, use Developer Mode until Adobe ships a fix.
+- A byte-for-byte identical `.ccx` that installed cleanly in August now fails
+  with the same error.
+- `scripts/install-macos.sh` does **not** get around it — the agent forwards
+  the request to the Creative Cloud desktop app, which is where it fails.
+- Developer Mode (loading via UDT) is unaffected; it never touches Creative
+  Cloud's install path.
 
-`host.minVersion` in `uxp.config.ts` is deliberately pinned low (`22.0.0`)
-because a *separate*, older installer bug rejects any "real" minimum version
-regardless of what's installed. It does not fix the `-267` failure above. The
-plugin still needs a reasonably current Photoshop in practice — that floor
-comes from `apiVersion: 2` / `manifestVersion: 5` (~Photoshop 24.2+).
+No manifest change fixes this. Until Adobe ships a fix, use Developer Mode.
+Others are hitting the same wall on Photoshop 27.9+:
+<https://forums.creativeclouddeveloper.com/t/photoshop-27-9-1-packaged-uxp-plugin-ccx-fails-to-install-couldnt-install-plugin-compatible-app-required-premiere-fine-dev-mode-fine/12089>
 
-References:
-[minVersion bug](https://forums.creativeclouddeveloper.com/t/manifest-minversion-issue/2525),
-[Photoshop 27.9 install regression](https://forums.creativeclouddeveloper.com/t/photoshop-27-9-1-packaged-uxp-plugin-ccx-fails-to-install-couldnt-install-plugin-compatible-app-required-premiere-fine-dev-mode-fine/12089).
+Note also that `host.minVersion` in `uxp.config.ts` is pinned low (`22.0.0`)
+for an unrelated, older installer bug that rejects a "real" minimum version
+([thread](https://forums.creativeclouddeveloper.com/t/manifest-minversion-issue/2525));
+that pin has nothing to do with `-267`. The plugin still needs a fairly
+current Photoshop in practice, from `apiVersion: 2` / `manifestVersion: 5`
+(~Photoshop 24.2+).
 
 ## License
 
