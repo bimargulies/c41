@@ -23,7 +23,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm run build
+      - name: Package .ccx
+        run: pnpm run package "dist/c41-${GITHUB_REF_NAME}.ccx"
 
       - name: Check manifest version matches tag
         run: |
@@ -33,13 +34,6 @@ jobs:
             echo "Tag version ($TAG_VERSION) does not match manifest version ($MANIFEST_VERSION)" >&2
             exit 1
           fi
-
-      - name: Package .ccx
-        run: |
-          ID="$(node -p "require('./dist/manifest.json').id")"
-          APP="$(node -p "require('./dist/manifest.json').host[0].app")"
-          cd dist
-          zip -r "${ID}_${APP}.ccx" manifest.json index.js icons
 
       - name: Create release
         uses: softprops/action-gh-release@v3
