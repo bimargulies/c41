@@ -4,18 +4,18 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative
 film. Its one command, **Add C41 Adjustment Layers**, adds two adjustment
 layers to the active document:
 
-1. **Invert** — stacked directly above the Levels layer, flipping the
-   (now channel-balanced) negative into a positive.
-2. **Levels** — for each of the red, green, and blue channels, the input
-   range is stretched to that channel's actual minimum and maximum pixel
-   value in the image (an auto-contrast per channel). This is a quick way
-   to cancel out the orange film-base mask and color cast typical of C-41
+1. **Invert** — the top layer, flipping the negative into a positive. Because
+   it sits above Levels, it acts on the already channel-balanced image.
+2. **Levels** — directly below Invert. For each of the red, green, and blue
+   channels, the input range is stretched to that channel's actual minimum
+   and maximum pixel value in the image (an auto-contrast per channel). This
+   cancels out the orange film-base mask and color cast typical of C-41
    negative scans.
 
 Both layers are added in a single undoable step.
 
-The choice of 'minimal and maximal' pixels is made using one of three methods, 
-selectable in preferences.
+How each channel's "minimum" and "maximum" pixel values are chosen is
+configurable in preferences; there are three methods.
 
 ## Requirements
 
