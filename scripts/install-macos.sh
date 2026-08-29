@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #
-# Install the C41 UXP plugin into Photoshop on macOS via Adobe's
-# UnifiedPluginInstallerAgent, bypassing the Creative Cloud Desktop
-# double-click flow. Useful when that flow wrongly reports
-# "you do not have a compatible version of Photoshop installed".
+# Build, package, and install the C41 UXP plugin into Photoshop on macOS via
+# Adobe's UnifiedPluginInstallerAgent (also --remove / --list).
+#
+# Note: the agent forwards to the Creative Cloud desktop app, so this is NOT a
+# way around a broken CCD install (e.g. the current "-267 / failed to generate
+# mxi" regression). See the README's "When .ccx installation fails" section.
 #
 # Usage:
 #   scripts/install-macos.sh                 build, package dist/ into a .ccx, and install it
