@@ -52,47 +52,36 @@ This produces `dist/manifest.json` and `dist/index.js`.
 
 ## Installing into a normal Photoshop
 
-To install without Developer Mode, package the plugin as a `.ccx` from UDT
-(`...` menu → **Package**, built from `pnpm run build`, not `watch`, so the
-dev-only hot-reload permission isn't included) and double-click the result
-to install it via the Creative Cloud desktop app.
+To install without Developer Mode you need a `.ccx` package. Build one with:
 
-`scripts/install-macos.sh` automates the build + package + install on macOS
-(and `--remove` / `--list`). It drives Adobe's bundled
+```bash
+pnpm run package        # writes ./c41.ccx
+```
+
+Then double-click `c41.ccx` to install it via the Creative Cloud desktop app,
+or download the `.ccx` attached to a [release](../../releases). On macOS,
+`scripts/install-macos.sh` does the build + package + install in one step
+(and `scripts/install-macos.sh --remove` / `--list`), driving Adobe's bundled
 `UnifiedPluginInstallerAgent`; you must be signed into the Creative Cloud
 desktop app (5.7+) with an entitled Adobe ID.
 
-### When `.ccx` installation fails
+Packaging from the UXP Developer Tool (`...` menu → **Package**) also works.
 
-As of Photoshop 27.10 / Creative Cloud 6.10 (August 2026), packaged installs
-fail on this machine with `Failed to install, status = -267!`. The installer
-agent's own log (`~/Library/Application Support/Adobe/UPI/Log/EMCL.log`) gives
-the real reason:
+### Why `pnpm run package`, not just `pnpm run build`
 
-```
-uxp manifest file is invalid or fields missing
-Failed to generate mxi for uxp extension
-```
+`pnpm run build` emits a `manifest.json` whose `host` is a one-element array,
+per the current UXP manifest schema. The UXP runtime and UDT accept that, but
+Creative Cloud's installer does not — it fails mxi generation with
+`Failed to install, status = -267!`. `pnpm run package` (and UDT's Package
+command) collapse `host` to a bare object, which the installer accepts.
 
-This is an Adobe-side regression, not a problem with this plugin:
+### Why `host.minVersion` is `22.0.0`
 
-- A byte-for-byte identical `.ccx` that installed cleanly in August now fails
-  with the same error.
-- `scripts/install-macos.sh` does **not** get around it — the agent forwards
-  the request to the Creative Cloud desktop app, which is where it fails.
-- Developer Mode (loading via UDT) is unaffected; it never touches Creative
-  Cloud's install path.
-
-No manifest change fixes this. Until Adobe ships a fix, use Developer Mode.
-Others are hitting the same wall on Photoshop 27.9+:
-<https://forums.creativeclouddeveloper.com/t/photoshop-27-9-1-packaged-uxp-plugin-ccx-fails-to-install-couldnt-install-plugin-compatible-app-required-premiere-fine-dev-mode-fine/12089>
-
-Note also that `host.minVersion` in `uxp.config.ts` is pinned low (`22.0.0`)
-for an unrelated, older installer bug that rejects a "real" minimum version
-([thread](https://forums.creativeclouddeveloper.com/t/manifest-minversion-issue/2525));
-that pin has nothing to do with `-267`. The plugin still needs a fairly
-current Photoshop in practice, from `apiVersion: 2` / `manifestVersion: 5`
-(~Photoshop 24.2+).
+An older Creative Cloud installer bug rejects any "real" minimum version
+([thread](https://forums.creativeclouddeveloper.com/t/manifest-minversion-issue/2525)),
+so `uxp.config.ts` pins it low. The plugin still needs a fairly current
+Photoshop in practice — that comes from `apiVersion: 2` /
+`manifestVersion: 5` (~Photoshop 24.2+).
 
 ## License
 
