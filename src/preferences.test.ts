@@ -24,28 +24,41 @@ afterEach(() => {
 
 describe('getPreferences', () => {
 	it('returns defaults when nothing is stored', () => {
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 	});
 
 	it('merges stored values over the defaults', () => {
-		localStorage.setItem('c41.preferences', JSON.stringify({ useThreshold: true, threshold: 42 }));
-		expect(getPreferences()).toEqual({ useThreshold: true, threshold: 42 });
+		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'threshold', threshold: 42 }));
+		expect(getPreferences()).toEqual({ detectionMethod: 'threshold', threshold: 42 });
 	});
 
 	it('falls back to defaults on corrupt stored JSON', () => {
 		localStorage.setItem('c41.preferences', '{not json');
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
+	});
+
+	it('falls back to the default detection method when the stored value is not a recognized mode', () => {
+		// prefs written before detectionMethod became an enum (e.g. a stale boolean/string)
+		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'auto', threshold: 12 }));
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 12 });
+	});
+
+	it('falls back to the default detection method when the stored value is missing', () => {
+		localStorage.setItem('c41.preferences', JSON.stringify({ threshold: 7 }));
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 7 });
 	});
 });
 
 describe('openC41Preferences', () => {
 	it('pre-fills the form from the currently stored preferences', async () => {
-		localStorage.setItem('c41.preferences', JSON.stringify({ useThreshold: true, threshold: 55 }));
+		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'threshold', threshold: 55 }));
 
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
-		expect(dialog.querySelector<HTMLInputElement>('#useThreshold')!.checked).toBe(true);
+		expect(dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked).toBe(true);
+		expect(dialog.querySelector<HTMLInputElement>('#modeExtreme')!.checked).toBe(false);
+		expect(dialog.querySelector<HTMLInputElement>('#modeKneeDetection')!.checked).toBe(false);
 		expect(dialog.querySelector<HTMLInputElement>('#threshold')!.value).toBe('55');
 
 		dialog.close();
@@ -56,12 +69,37 @@ describe('openC41Preferences', () => {
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
-		dialog.querySelector<HTMLInputElement>('#useThreshold')!.checked = true;
+		dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked = true;
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '42';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ useThreshold: true, threshold: 42 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'threshold', threshold: 42 });
+		expect(document.querySelector('dialog')).toBeNull();
+	});
+
+	it('saves extreme mode without requiring a valid threshold value', async () => {
+		const opened = openC41Preferences();
+		const dialog = document.querySelector('dialog')!;
+
+		dialog.querySelector<HTMLInputElement>('#modeExtreme')!.checked = true;
+		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '';
+		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
+		await opened;
+
+		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(document.querySelector('dialog')).toBeNull();
+	});
+
+	it('saves knee detection mode', async () => {
+		const opened = openC41Preferences();
+		const dialog = document.querySelector('dialog')!;
+
+		dialog.querySelector<HTMLInputElement>('#modeKneeDetection')!.checked = true;
+		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
+		await opened;
+
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
@@ -69,23 +107,24 @@ describe('openC41Preferences', () => {
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
-		dialog.querySelector<HTMLInputElement>('#useThreshold')!.checked = true;
+		dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked = true;
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '99';
 		dialog.querySelector<HTMLButtonElement>('#cancelPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
-	it('rejects an out-of-range threshold, shows an error, and does not save or close', async () => {
+	it('rejects an out-of-range threshold in threshold mode, shows an error, and does not save or close', async () => {
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
+		dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked = true;
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '150';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).not.toBeNull();
 		expect(dialog.querySelector('#thresholdError')!.textContent).not.toBe('');
 
@@ -93,14 +132,15 @@ describe('openC41Preferences', () => {
 		await opened;
 	});
 
-	it('rejects an empty threshold, shows an error, and does not save or close', async () => {
+	it('rejects an empty threshold in threshold mode, shows an error, and does not save or close', async () => {
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
+		dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked = true;
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).not.toBeNull();
 		expect(dialog.querySelector('#thresholdError')!.textContent).not.toBe('');
 
@@ -114,6 +154,7 @@ describe('openC41Preferences', () => {
 		const thresholdInput = dialog.querySelector<HTMLInputElement>('#threshold')!;
 		const okButton = dialog.querySelector<HTMLButtonElement>('#okPreferences')!;
 
+		dialog.querySelector<HTMLInputElement>('#modeThreshold')!.checked = true;
 		thresholdInput.value = '150';
 		okButton.click();
 		expect(dialog.querySelector('#thresholdError')!.textContent).not.toBe('');
@@ -122,6 +163,6 @@ describe('openC41Preferences', () => {
 		okButton.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ useThreshold: false, threshold: 50 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'threshold', threshold: 50 });
 	});
 });

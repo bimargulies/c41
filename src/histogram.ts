@@ -1,4 +1,5 @@
 import { action } from 'adobe:photoshop';
+import { findKnees } from './find-knees';
 
 // `Channel.histogram` (the DOM API) throws "the operation is not valid for channels of
 // type component" for the individual red/green/blue channels of an RGB document, so the
@@ -65,7 +66,7 @@ export function getThresholdsFromHistogram(histogram: number[], thresholdPercent
 	};
 }
 
-// Calculate level thresholds by color channel based on the histogram of the active document and a given threshold percentage. 
+// Calculate level thresholds by color channel based on the histogram of the active document and a given threshold percentage.
 // The thresholds are calculated such that the specified percentage of nonzero pixels are excluded from both the lower and upper ends of the histogram for each channel.
 export async function getLayerThresholdsFromHistograms(thresholdPercentage: number): Promise<AllLimitValues> {
 	const histograms = await getChannelHistograms();
@@ -73,5 +74,25 @@ export async function getLayerThresholdsFromHistograms(thresholdPercentage: numb
 		red: getThresholdsFromHistogram(histograms.get('Red')!, thresholdPercentage),
 		green: getThresholdsFromHistogram(histograms.get('Green')!, thresholdPercentage),
 		blue: getThresholdsFromHistogram(histograms.get('Blue')!, thresholdPercentage)
+	};
+}
+
+// Find the pixel value at each end of the histogram where the steep falloff from the main mass of
+// pixels bends into the flat/near-empty tail (see find-knees.ts). Falls back to the full 0-255
+// range for a channel if no knee is found above the noise floor.
+function getKneeLimitsFromHistogram(histogram: number[]): LimitValues {
+	const { leftKnee, rightKnee } = findKnees(histogram);
+	return {
+		min: leftKnee ?? 0,
+		max: rightKnee ?? 255,
+	};
+}
+
+export async function getLayerLimitsFromKnees(): Promise<AllLimitValues> {
+	const histograms = await getChannelHistograms();
+	return {
+		red: getKneeLimitsFromHistogram(histograms.get('Red')!),
+		green: getKneeLimitsFromHistogram(histograms.get('Green')!),
+		blue: getKneeLimitsFromHistogram(histograms.get('Blue')!),
 	};
 }

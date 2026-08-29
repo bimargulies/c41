@@ -11,6 +11,9 @@ importers:
       '@bubblydoo/uxp-toolkit':
         specifier: ^0.0.21
         version: 0.0.21(zod@4.4.3)
+      ml-savitzky-golay:
+        specifier: ^5.0.0
+        version: 5.0.0
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -543,6 +546,9 @@ packages:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
 
+  is-any-array@3.0.0:
+    resolution: {integrity: sha512-o4h+tylWykC4BD1vaejp6gDxoM13bwW8FGuNs4yIKpj8xbBJcRxJx8vZpq0dCr7ZDEfeKjmsi/euolKhX6f/ww==}
+
   is-potential-custom-element-name@1.0.1:
     resolution: {integrity: sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ==}
 
@@ -568,6 +574,25 @@ packages:
 
   mdn-data@2.27.1:
     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
+
+  ml-array-max@2.0.0:
+    resolution: {integrity: sha512-QQZ4kENwpWmyNb98UXRDFXrmtIXuXtt1+bSbda/2KA85+F+rrJP8hZk6QOkCQXM2Th9mUDYdq/PNByPdT9ID4A==}
+
+  ml-array-min@2.0.0:
+    resolution: {integrity: sha512-GRj6Ky6sW9vGL6yIjgsHmXZ9YgrdmcQ8nCxPqEGeKc6dkfYg1XDYxGFxADUjNuZyoCd5PUscWAS4N+cFaX6hFg==}
+
+  ml-array-rescale@2.0.0:
+    resolution: {integrity: sha512-2GGtKfSno94/kIloWGvpp/U5Q5vLvLrza+SAaGsLeo6Xj4mEbA6Gqx+oTfZFkxnd1grT2X007HfJNs3T5BsiVg==}
+
+  ml-matrix@6.15.0:
+    resolution: {integrity: sha512-wFa1v6KP8bKp+fj0nYmRs1Pb5K4zRkXGKsOvLinvILENFIADncm4XlOI+S1M7yuACMGfI6cfk0IifDgd4j5xmw==}
+
+  ml-pad-array@2.0.0:
+    resolution: {integrity: sha512-X/gxCzAsv2fvseFYaWWSndDp7tcSPvBGCcH80YgR+sxLq39ZeMEUjSUPcW2dvRvJ30c1pdXNBcUvKWrnuNmLrg==}
+
+  ml-savitzky-golay@5.0.0:
+    resolution: {integrity: sha512-N6KrfzqHC+XRfybTUsnY1/6boOUVh/fewLNO7cS8QvEREYX55H7l7FsYfhCTd6JPZ1obqo5yjpsQpJAT9iGrVw==}
+    engines: {node: '>=12'}
 
   nanoid@3.3.16:
     resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
@@ -1183,6 +1208,8 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
+  is-any-array@3.0.0: {}
+
   is-potential-custom-element-name@1.0.1: {}
 
   js-yaml@4.3.0:
@@ -1222,6 +1249,32 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   mdn-data@2.27.1: {}
+
+  ml-array-max@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-min@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+
+  ml-array-rescale@2.0.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-max: 2.0.0
+      ml-array-min: 2.0.0
+
+  ml-matrix@6.15.0:
+    dependencies:
+      is-any-array: 3.0.0
+      ml-array-rescale: 2.0.0
+
+  ml-pad-array@2.0.0: {}
+
+  ml-savitzky-golay@5.0.0:
+    dependencies:
+      ml-matrix: 6.15.0
+      ml-pad-array: 2.0.0
 
   nanoid@3.3.16: {}
 

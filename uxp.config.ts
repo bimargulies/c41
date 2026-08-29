@@ -25,12 +25,22 @@ export const manifest: UxpManifest = {
 		},
 		{
 			type: 'command',
+			id: 'exportChannelHistograms',
+			label: {
+				default: 'Export Channel Histograms...',
+			},
+		},
+		{
+			type: 'command',
 			id: 'openC41Preferences',
 			label: {
 				default: 'Preferences...',
 			},
 		},
 	],
+	requiredPermissions: {
+		localFileSystem: 'request',
+	},
 	icons: [
 		{
 			width: 23,
