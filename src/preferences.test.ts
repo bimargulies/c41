@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe('getPreferences', () => {
 	it('returns defaults when nothing is stored', () => {
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 	});
 
 	it('merges stored values over the defaults', () => {
@@ -34,7 +34,18 @@ describe('getPreferences', () => {
 
 	it('falls back to defaults on corrupt stored JSON', () => {
 		localStorage.setItem('c41.preferences', '{not json');
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
+	});
+
+	it('falls back to the default detection method when the stored value is not a recognized mode', () => {
+		// prefs written before detectionMethod became an enum (e.g. a stale boolean/string)
+		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'auto', threshold: 12 }));
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 12 });
+	});
+
+	it('falls back to the default detection method when the stored value is missing', () => {
+		localStorage.setItem('c41.preferences', JSON.stringify({ threshold: 7 }));
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 7 });
 	});
 });
 
@@ -101,7 +112,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLButtonElement>('#cancelPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
@@ -113,7 +124,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '150';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).not.toBeNull();
 		expect(dialog.querySelector('#thresholdError')!.textContent).not.toBe('');
 
@@ -129,7 +140,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLInputElement>('#threshold')!.value = '';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', threshold: 0 });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', threshold: 0 });
 		expect(document.querySelector('dialog')).not.toBeNull();
 		expect(dialog.querySelector('#thresholdError')!.textContent).not.toBe('');
 
