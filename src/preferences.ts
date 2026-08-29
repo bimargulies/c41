@@ -55,16 +55,15 @@ export async function openC41Preferences() {
 			}
 			.buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 			.error { color: #f66; min-height: 1.2em; }
-			input[type="number"] {
+			input[type="number"]#threshold {
 				flex: 0 0 auto;
-				width: 4ch !important;
-				min-width: 0 !important;
-				max-width: 4ch !important;
-				box-sizing: content-box;
+				width: 56px;
+				min-width: 0;
+				box-sizing: border-box;
 				padding: 2px 6px;
 				text-align: right;
 				color: var(--uxp-host-text-color, #fff);
-				background-color: var(--uxp-host-background-color, #323232);
+				background-color: var(--uxp-host-background-color, #383838);
 				border: 1px solid var(--uxp-host-border-color, #6e6e6e);
 			}
 		</style>
@@ -86,7 +85,7 @@ export async function openC41Preferences() {
 			</div>
 			<label class="row">
 				Threshold percentage (0-100):
-				<input type="number" id="threshold" size="3" min="0" max="100" required value="${prefs.threshold}" />
+				<input type="number" id="threshold" min="0" max="100" required value="${prefs.threshold}" />
 			</label>
 			<div id="thresholdError" class="error"></div>
 			<label class="row">
