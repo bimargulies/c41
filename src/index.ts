@@ -1,5 +1,5 @@
 import { entrypoints } from "uxp";
-import { action, core, imaging } from "adobe:photoshop";
+import { action, app, imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
 import { getLayerThresholdsFromHistograms, getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./exportHistograms";
@@ -8,30 +8,30 @@ console.log("[c41] plugin script evaluated");
 
 type ActionDescriptor = Parameters<typeof action.batchPlay>[0][number];
 
-// core.executeAsModal swallows any error thrown inside its callback (it just
-// rejects with a generic "callback threw" wrapper). Catch it and rethrow the
-// real one so the command handlers can log something useful.
-async function executeAsModal<T>(commandName: string, fn: () => Promise<T>): Promise<T> {
-  let result: T;
+// Run `fn` as a single undoable step on the active document. suspendHistory
+// (itself a wrapper over core.executeAsModal) coalesces every change made in
+// the callback into one named history state, so both adjustment layers are
+// added and removed by a single undo. Like executeAsModal it swallows errors
+// thrown inside the callback, so capture and rethrow.
+async function asSingleHistoryStep(name: string, fn: () => Promise<void>): Promise<void> {
   let error: unknown;
-  await core.executeAsModal(
-    async () => {
-      try {
-        result = await fn();
-      } catch (e) {
-        error = e;
-      }
-    },
-    { commandName },
-  );
+  await app.activeDocument.suspendHistory(async () => {
+    try {
+      await fn();
+    } catch (e) {
+      error = e;
+    }
+  }, name);
   if (error) throw error;
-  return result!;
 }
 
 // Run one modifying batchPlay descriptor, turning a returned error descriptor
-// into a real thrown Error. Must be called inside an executeAsModal scope.
+// into a real thrown Error. Must be called inside a modal scope (asSingleHistoryStep).
 async function batchPlayModifying(descriptor: ActionDescriptor): Promise<void> {
-  const [result] = await action.batchPlay([descriptor], {});
+  const [result] = await action.batchPlay([descriptor], {
+    modalBehavior: "execute",
+    dialogOptions: "silent",
+  });
   if (result?._obj === "error") {
     console.error("[c41] batchPlay error descriptor:", result);
     throw new Error(`batchPlay command failed: ${result.message ?? "unknown error"}`);
@@ -92,7 +92,7 @@ async function exportChannelHistograms() {
 
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
-  await executeAsModal("Add C41 Adjustment Layers", async () => {
+  await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
     await batchPlayModifying({
       _obj: "make",
       _target: [{ _ref: "adjustmentLayer" }],
