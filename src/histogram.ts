@@ -77,14 +77,23 @@ export async function getLayerThresholdsFromHistograms(thresholdPercentage: numb
 	};
 }
 
+// Cumulative-mass clip used for an end where knee detection comes up empty.
+// 0.1% of pixels is the conventional auto-levels default.
+const KNEE_FALLBACK_CLIP_PERCENT = 0.1;
+
 // Find the pixel value at each end of the histogram where the steep falloff from the main mass of
-// pixels bends into the flat/near-empty tail (see find-knees.ts). Falls back to the full 0-255
-// range for a channel if no knee is found above the noise floor.
-function getKneeLimitsFromHistogram(histogram: number[]): LimitValues {
+// pixels bends into the flat/near-empty tail (see find-knees.ts). If a knee scan comes up empty on
+// an end (no bend clears the noise floor), fall back to a small cumulative-mass clip there rather
+// than to 0 / 255, which would apply no correction at all.
+export function getKneeLimitsFromHistogram(histogram: number[]): LimitValues {
 	const { leftKnee, rightKnee } = findKnees(histogram);
+	if (leftKnee !== null && rightKnee !== null) {
+		return { min: leftKnee, max: rightKnee };
+	}
+	const totalNonzero = countNonzeroEntriesInHistogram(histogram);
 	return {
-		min: leftKnee ?? 0,
-		max: rightKnee ?? 255,
+		min: leftKnee ?? getLowerThresholdFromHistogram(histogram, totalNonzero, KNEE_FALLBACK_CLIP_PERCENT),
+		max: rightKnee ?? getUpperThresholdFromHistogram(histogram, totalNonzero, KNEE_FALLBACK_CLIP_PERCENT),
 	};
 }
 
