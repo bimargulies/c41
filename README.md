@@ -27,6 +27,41 @@ chopper stops as soon as it sees a pixel. The percentage is probably a less usef
 the knee: it pays no attention to the shape of the curve, and simply assumes that the extremes are
 unwanted.
 
+## How the knee detector works
+
+`src/find-knees.ts` scans a channel's histogram in from bin 0, and separately in from bin 255, and
+reports the first place each scan hits a *significant* bend. Because it stops at the first bend,
+whatever's going on in the messy middle of the histogram (secondary peaks, spikes) doesn't matter.
+
+To decide what counts as significant, it normalizes the histogram to [0, 1] by its own peak (so the
+same logic works whether the peak is a few hundred pixels or a few million), smooths it and takes
+the derivative, and sets a threshold from the noise level in the flat regions near each edge. A run
+of samples whose derivative clears that threshold is a knee.
+
+Two things about real scans forced adjustments that a tidier, synthetic histogram wouldn't have
+needed:
+
+- **Not every histogram is flat at both edges.** A channel can hold several percent of its pixels in
+  bin 0 or 255 — usually the film-base end. If that falling shoulder gets pooled into the "this edge
+  is flat noise" estimate, it drags the threshold up enough to miss a real, gentle bend on the far
+  side. So an edge only counts toward the noise estimate if it's actually flat (`flatEdgeMaxFraction`);
+  a clipped edge gets scanned with a separate, higher threshold instead (`clippedEdgeThresholdFraction`).
+- **The raw crossing lands a few samples inside the corner a person would pick**, a side effect of the
+  smoothing. That bias was measured against real scans, not derived analytically, and is subtracted
+  as a small constant (`lagCorrection`).
+
+`src/find-knees.test.ts` is where this is actually tuned, and it's the ground truth: every case is a
+real channel histogram exported from a scan (see `exportHistograms.ts`), with a knee position picked
+by eye, not by running the algorithm and calling it correct. If the detector misjudges a new image,
+the fix is to add its histogram as a case with the position you'd pick, then adjust `find-knees.ts`
+until it — and every case already passing — lands within tolerance. A few samples of slack per case
+is normal; smoothing can't be made pixel-exact without also becoming noise-sensitive.
+
+One known soft spot: a shoulder that's a near-vertical cliff, rather than a gradual bend, gets read
+at "where the flat tail first starts bending," which can sit a bit inside of where a person would
+eyeball the true corner. That case in the test file just carries extra tolerance, rather than
+distorting the algorithm to chase it.
+
 ## Requirements
 
 - Photoshop 24.0.0 or later
