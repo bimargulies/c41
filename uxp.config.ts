@@ -1,6 +1,6 @@
-import type { UxpManifest } from '@bubblydoo/vite-uxp-plugin';
+import type { UXP_Config, UXP_Manifest } from 'vite-uxp-plugin';
 
-export const manifest: UxpManifest = {
+const manifest: UXP_Manifest = {
 	id: 'b7e22b3b',
 	name: 'C41 tools',
 	version: '1.2.2',
@@ -63,4 +63,16 @@ export const manifest: UxpManifest = {
 			theme: ['lightest', 'light'],
 		},
 	],
+};
+
+// scripts/release.mjs bumps `manifest.version` above by text-substituting the
+// first `version: '...'` in this file.
+export const config: UXP_Config = {
+	// Dev-only knobs (unused by `vite build` / `MODE=package`); vite-uxp-plugin
+	// requires them to be present.
+	hotReloadPort: 8080,
+	webviewUi: false,
+	webviewReloadPort: 8082,
+	copyZipAssets: [],
+	manifest,
 };

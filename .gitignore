@@ -7,3 +7,5 @@ dist/
 
 # build artifacts
 *.ccx
+ccx/
+zip/
