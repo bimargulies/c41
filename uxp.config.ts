@@ -68,6 +68,12 @@ const manifest: UXP_Manifest = {
 // scripts/release.mjs bumps `manifest.version` above by text-substituting the
 // first `version: '...'` in this file.
 export const config: UXP_Config = {
+	// Keep the packaged manifest id exactly as `manifest.id` above. By default
+	// vite-uxp-plugin rewrites it to `<id>_<app>` per host, which makes a new
+	// install register as a *different* plugin and sit alongside the old one
+	// instead of replacing it. That id-mangling only earns its keep for a
+	// multi-host plugin; c41 targets Photoshop only.
+	uniqueIds: false,
 	// Dev-only knobs (unused by `vite build` / `MODE=package`); vite-uxp-plugin
 	// requires them to be present.
 	hotReloadPort: 8080,
