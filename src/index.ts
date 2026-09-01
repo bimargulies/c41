@@ -1,12 +1,42 @@
 import { entrypoints } from "uxp";
-import { executeAsModal, createCommand } from "@bubblydoo/uxp-toolkit";
-import { z } from "zod";
-import { imaging } from "adobe:photoshop";
+import { action, app, imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
 import { getLayerThresholdsFromHistograms, getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./exportHistograms";
 
 console.log("[c41] plugin script evaluated");
+
+type ActionDescriptor = Parameters<typeof action.batchPlay>[0][number];
+
+// Run `fn` as a single undoable step on the active document. suspendHistory
+// (itself a wrapper over core.executeAsModal) coalesces every change made in
+// the callback into one named history state, so both adjustment layers are
+// added and removed by a single undo. Like executeAsModal it swallows errors
+// thrown inside the callback, so capture and rethrow.
+async function asSingleHistoryStep(name: string, fn: () => Promise<void>): Promise<void> {
+  let error: unknown;
+  await app.activeDocument.suspendHistory(async () => {
+    try {
+      await fn();
+    } catch (e) {
+      error = e;
+    }
+  }, name);
+  if (error) throw error;
+}
+
+// Run one modifying batchPlay descriptor, turning a returned error descriptor
+// into a real thrown Error. Must be called inside a modal scope (asSingleHistoryStep).
+async function batchPlayModifying(descriptor: ActionDescriptor): Promise<void> {
+  const [result] = await action.batchPlay([descriptor], {
+    modalBehavior: "execute",
+    dialogOptions: "silent",
+  });
+  if (result?._obj === "error") {
+    console.error("[c41] batchPlay error descriptor:", result);
+    throw new Error(`batchPlay command failed: ${result.message ?? "unknown error"}`);
+  }
+}
 
 // FInd the lowest and highest pixel values for each channel in the active document, using the imaging API to get pixel data.
 // This is used when the threshold preference is disabled, to set the levels adjustment layer input values to the full range of pixel values in the image.
@@ -62,23 +92,17 @@ async function exportChannelHistograms() {
 
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
-  await executeAsModal("Add C41 Adjustment Layers", async (executionContext) => {
-	
-    const invertCommand = createCommand({
-      modifying: true,
-      descriptor: {
-        _obj: "make",
-        _target: [{ _ref: "adjustmentLayer" }],
-        using: {
-          _obj: "adjustmentLayer",
-          type: {
-            _obj: "invert",
-          },
+  await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
+    await batchPlayModifying({
+      _obj: "make",
+      _target: [{ _ref: "adjustmentLayer" }],
+      using: {
+        _obj: "adjustmentLayer",
+        type: {
+          _obj: "invert",
         },
       },
-      schema: z.unknown(),
     });
-    await executionContext.batchPlayCommand(invertCommand);
 
     let limits: AllLimitValues;
     switch (prefs.detectionMethod) {
@@ -97,62 +121,43 @@ async function addLevelsAndInvert() {
         break;
     }
 
-    const levelsCommand = createCommand({
-      modifying: true,
-      descriptor: {
-        _obj: "make",
-        _target: [{ _ref: "adjustmentLayer" }],
-        using: {
-          _obj: "adjustmentLayer",
-          type: {
-            _obj: "levels",
-            presetKind: {
-              _enum: "presetKindType",
-              _value: "presetKindCustom",
-            },
-            adjustment: [
-              {
-                _obj: "levelsAdjustment",
-                channel: {
-                  _ref: "channel",
-                  _enum: "channel",
-                  _value: "red",
-                },
-                input: [limits.red.min, limits.red.max],
-                gamma: 1,
-                output: [0, 255],
-              },
-              {
-                _obj: "levelsAdjustment",
-                channel: {
-                  _ref: "channel",
-                  _enum: "channel",
-                  _value: "green",
-                },
-                input: [limits.green.min, limits.green.max],
-                gamma: 1,
-                output: [0, 255],
-              },
-              {
-                _obj: "levelsAdjustment",
-                channel: {
-                  _ref: "channel",
-                  _enum: "channel",
-                  _value: "blue",
-                },
-                input: [limits.blue.min, limits.blue.max],
-                gamma: 1,
-                output: [0, 255],
-              },
-            ],
+    await batchPlayModifying({
+      _obj: "make",
+      _target: [{ _ref: "adjustmentLayer" }],
+      using: {
+        _obj: "adjustmentLayer",
+        type: {
+          _obj: "levels",
+          presetKind: {
+            _enum: "presetKindType",
+            _value: "presetKindCustom",
           },
+          adjustment: [
+            {
+              _obj: "levelsAdjustment",
+              channel: { _ref: "channel", _enum: "channel", _value: "red" },
+              input: [limits.red.min, limits.red.max],
+              gamma: 1,
+              output: [0, 255],
+            },
+            {
+              _obj: "levelsAdjustment",
+              channel: { _ref: "channel", _enum: "channel", _value: "green" },
+              input: [limits.green.min, limits.green.max],
+              gamma: 1,
+              output: [0, 255],
+            },
+            {
+              _obj: "levelsAdjustment",
+              channel: { _ref: "channel", _enum: "channel", _value: "blue" },
+              input: [limits.blue.min, limits.blue.max],
+              gamma: 1,
+              output: [0, 255],
+            },
+          ],
         },
       },
-      schema: z.unknown(),
     });
-    await executionContext.batchPlayCommand(levelsCommand);
-
-
   });
 }
 

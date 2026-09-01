@@ -1,6 +1,6 @@
-import type { UxpManifest } from '@bubblydoo/vite-uxp-plugin';
+import type { UXP_Config, UXP_Manifest } from 'vite-uxp-plugin';
 
-export const manifest: UxpManifest = {
+const manifest: UXP_Manifest = {
 	id: 'b7e22b3b',
 	name: 'C41 tools',
 	version: '1.2.2',
@@ -63,4 +63,22 @@ export const manifest: UxpManifest = {
 			theme: ['lightest', 'light'],
 		},
 	],
+};
+
+// scripts/release.mjs bumps `manifest.version` above by text-substituting the
+// first `version: '...'` in this file.
+export const config: UXP_Config = {
+	// Keep the packaged manifest id exactly as `manifest.id` above. By default
+	// vite-uxp-plugin rewrites it to `<id>_<app>` per host, which makes a new
+	// install register as a *different* plugin and sit alongside the old one
+	// instead of replacing it. That id-mangling only earns its keep for a
+	// multi-host plugin; c41 targets Photoshop only.
+	uniqueIds: false,
+	// Dev-only knobs (unused by `vite build` / `MODE=package`); vite-uxp-plugin
+	// requires them to be present.
+	hotReloadPort: 8080,
+	webviewUi: false,
+	webviewReloadPort: 8082,
+	copyZipAssets: [],
+	manifest,
 };

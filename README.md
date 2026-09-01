@@ -117,8 +117,10 @@ Packaging from the UXP Developer Tool (`...` menu → **Package**) also works.
 
 `pnpm run build` emits a `manifest.json` whose `host` is a one-element array, per the current UXP
 manifest schema. The UXP runtime and UDT accept that, but Creative Cloud's installer does not — it
-fails mxi generation with `Failed to install, status = -267!`. `pnpm run package` (and UDT's Package
-command) collapse `host` to a bare object, which the installer accepts.
+fails mxi generation with `Failed to install, status = -267!`. `pnpm run package` runs the build
+with `MODE=package`, which has [`vite-uxp-plugin`](https://github.com/hyperbrew/bolt-uxp) collapse
+`host` to a bare object in the packaged `.ccx` (UDT's own Package command does the same). The
+wrapper script then copies `ccx/<id>_PS.ccx` to `./c41.ccx`.
 
 ### Why `host.minVersion` is `22.0.0`
 

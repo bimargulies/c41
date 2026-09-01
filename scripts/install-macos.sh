@@ -5,9 +5,10 @@
 #
 # The agent forwards to the Creative Cloud desktop app, so this can't get
 # around a broken CCD install. It has fixed the "status = -267 / failed to
-# generate mxi" failure though: `pnpm package` (used here) collapses the
-# manifest's single-host array to an object, which the CCD installer needs.
-# See the README's "When .ccx installation fails" section.
+# generate mxi" failure though: `pnpm package` (used here) builds with
+# vite-uxp-plugin's package mode, which collapses the manifest's single-host
+# array to an object, which the CCD installer needs. See the README's
+# "Why `pnpm run package`" section.
 #
 # Usage:
 #   scripts/install-macos.sh                 build + package + install
@@ -19,7 +20,7 @@
 # Requirements:
 #   - Creative Cloud desktop app 5.7 or newer
 #   - Signed in with the Adobe ID entitled to the plugin
-#   - pnpm + zip on PATH (only for the build/package path)
+#   - pnpm on PATH (only for the build/package path)
 
 set -euo pipefail
 
