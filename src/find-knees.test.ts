@@ -12,7 +12,8 @@ interface TestCase {
   histogram: Histogram;
   options?: KneeDetectionOptions;
   /** How many samples off from the expected shoulder still counts as a pass.
-   *  Some slack is expected: smoothing adds lag roughly equal to windowSize/2. */
+   *  A few samples of slack is expected: findKnees corrects the mean
+   *  smoothing lag but not its per-histogram variation. */
   tolerance?: number;
 }
 
@@ -237,7 +238,7 @@ const cases: TestCase[] = [
       ],
       expectedLeft: 30,
       // Blue's right shoulder is a near-vertical cliff (normalized 0.99 at
-      // bin 150 -> 0.02 at bin 180). The detector reports ~183, where the
+      // bin 150 -> 0.02 at bin 180). The detector lands ~180, where the
       // curve first bends away from its flat tail - consistent with its
       // "first onset scanning inward" definition. ~172 (about halfway down
       // the cliff) would need a far higher scan threshold that breaks
@@ -245,14 +246,14 @@ const cases: TestCase[] = [
       // tolerance. See also the "blue from 2026-08-28-07" note above.
       expectedRight: 172,
     },
-    tolerance: 12,
+    tolerance: 8,
   },
 ];
 
 describe("findKnees", () => {
   it.each(cases)("$name", ({ histogram, options, tolerance }) => {
     const { counts, expectedLeft, expectedRight } = histogram;
-    const effectiveTolerance = tolerance ?? 8; // smoothing lag budget
+    const effectiveTolerance = tolerance ?? 5; // residual lag variation
 
     const result = findKnees(counts, options);
 

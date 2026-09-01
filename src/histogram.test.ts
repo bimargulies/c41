@@ -14,6 +14,12 @@ vi.mock('adobe:photoshop', () => ({
 	},
 }));
 
+// findKnees has its own exhaustive test suite; here it is mocked so the fallback
+// behaviour of getKneeLimitsFromHistogram can be exercised deterministically.
+vi.mock('./find-knees', () => ({ findKnees: vi.fn() }));
+const { findKnees } = await import('./find-knees');
+const mockFindKnees = vi.mocked(findKnees);
+
 const {
 	getLayerThresholdsFromHistograms,
 	getChannelHistograms,
@@ -21,6 +27,7 @@ const {
 	getLowerThresholdFromHistogram,
 	getUpperThresholdFromHistogram,
 	getThresholdsFromHistogram,
+	getKneeLimitsFromHistogram,
 } = await import('./histogram');
 
 function emptyHistogram(): number[] {
@@ -210,5 +217,47 @@ describe('getThresholdsFromHistogram', () => {
 		histogram[255] = 5;
 
 		expect(getThresholdsFromHistogram(histogram, 20)).toEqual({ min: 10, max: 30 });
+	});
+});
+
+describe('getKneeLimitsFromHistogram', () => {
+	// A block of equal mass over bins lo..hi and nothing elsewhere.
+	function block(lo: number, hi: number): number[] {
+		const histogram = emptyHistogram();
+		for (let i = lo; i <= hi; i++) histogram[i] = 1000;
+		return histogram;
+	}
+
+	const kneeResult = (leftKnee: number | null, rightKnee: number | null) => ({
+		leftKnee,
+		rightKnee,
+		normalized: [],
+		smoothed: [],
+		derivative: [],
+		derivativeMagnitude: [],
+		leftThreshold: 0,
+		rightThreshold: 0,
+		lagCorrection: 0,
+	});
+
+	afterEach(() => mockFindKnees.mockReset());
+
+	it('passes the detected knees straight through when both ends resolve', () => {
+		mockFindKnees.mockReturnValue(kneeResult(42, 205));
+
+		expect(getKneeLimitsFromHistogram(block(40, 210))).toEqual({ min: 42, max: 205 });
+	});
+
+	it('falls back to a 0.1% cumulative-mass clip on an end with no knee', () => {
+		mockFindKnees.mockReturnValue(kneeResult(null, 205));
+
+		// Mass spans bins 40..210, so the lower clip lands at bin 40 - not 0.
+		expect(getKneeLimitsFromHistogram(block(40, 210))).toEqual({ min: 40, max: 205 });
+	});
+
+	it('falls back on both ends when no knee is found at all', () => {
+		mockFindKnees.mockReturnValue(kneeResult(null, null));
+
+		expect(getKneeLimitsFromHistogram(block(40, 210))).toEqual({ min: 40, max: 210 });
 	});
 });
