@@ -2,17 +2,17 @@ import { entrypoints } from "uxp";
 import { action, app, imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
 import { getLayerThresholdsFromHistograms, getLayerLimitsFromKnees } from "./histogram";
-import { writeChannelHistogramsFile } from "./exportHistograms";
+import { writeChannelHistogramsFile } from "./export-histograms";
 
 console.log("[c41] plugin script evaluated");
 
 type ActionDescriptor = Parameters<typeof action.batchPlay>[0][number];
 
 // Run `fn` as a single undoable step on the active document. suspendHistory
-// (itself a wrapper over core.executeAsModal) coalesces every change made in
-// the callback into one named history state, so both adjustment layers are
-// added and removed by a single undo. Like executeAsModal it swallows errors
-// thrown inside the callback, so capture and rethrow.
+// (a thin wrapper over core.executeAsModal) coalesces every change made in the
+// callback into one named history state, so both adjustment layers are added
+// and removed by a single undo. A throw inside the callback can surface as an
+// opaque wrapper that loses the original error, so capture and rethrow it.
 async function asSingleHistoryStep(name: string, fn: () => Promise<void>): Promise<void> {
   let error: unknown;
   await app.activeDocument.suspendHistory(async () => {
@@ -38,9 +38,11 @@ async function batchPlayModifying(descriptor: ActionDescriptor): Promise<void> {
   }
 }
 
-// FInd the lowest and highest pixel values for each channel in the active document, using the imaging API to get pixel data.
-// This is used when the threshold preference is disabled, to set the levels adjustment layer input values to the full range of pixel values in the image.
-async function gerChannelLimitValues(): Promise<AllLimitValues> {
+// The brains of "extreme" levels method (preferences: "the darkest and lightest pixels").
+// Reads the composite with the imaging API and takes each channel's actual min
+// and max pixel value; addLevelsAndInvert uses those as the Levels input
+// black/white points, stretching the occupied range across the full 0-255 output.
+async function getChannelLimitValues(): Promise<AllLimitValues> {
   const { imageData } = await imaging.getPixels({ applyAlpha: true, componentSize: 8 });
   try {
     const data = (await imageData.getData({ chunky: true })) as Uint8Array;
@@ -116,7 +118,7 @@ async function addLevelsAndInvert() {
         break;
       case "extreme":
       default:
-        limits = await gerChannelLimitValues();
+        limits = await getChannelLimitValues();
         console.log("[c41] addC41AdjustmentLayers: using full range limits:", limits);
         break;
     }

@@ -19,7 +19,7 @@ vi.mock('uxp', () => ({
 	},
 }));
 
-const { writeChannelHistogramsFile } = await import('./exportHistograms');
+const { writeChannelHistogramsFile } = await import('./export-histograms');
 
 afterEach(() => {
 	getFileForSaving.mockReset();
