@@ -51,7 +51,7 @@ needed:
   as a small constant (`lagCorrection`).
 
 `src/find-knees.test.ts` is where this is actually tuned, and it's the ground truth: every case is a
-real channel histogram exported from a scan (see `exportHistograms.ts`), with a knee position picked
+real channel histogram exported from a scan (see `export-histograms.ts`), with a knee position picked
 by eye, not by running the algorithm and calling it correct. If the detector misjudges a new image,
 the fix is to add its histogram as a case with the position you'd pick, then adjust `find-knees.ts`
 until it — and every case already passing — lands within tolerance. A few samples of slack per case
