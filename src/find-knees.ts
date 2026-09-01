@@ -24,6 +24,17 @@
  * the first sustained onset of the (now scale-free) derivative magnitude
  * above a noise-derived threshold. This was verified against synthetic
  * histograms spanning peak heights from ~200 to ~50,000 counts.
+ *
+ * CLIPPED HISTOGRAMS: the "near-zero flat region" at each end is not
+ * guaranteed. A channel can still hold several percent of its pixels in
+ * bin 0 or bin 255, so the falling shoulder runs straight off the edge.
+ * Two adjustments handle this: (1) an edge is only pooled into the
+ * noise-floor estimate when it is genuinely flat (`flatEdgeMaxFraction`),
+ * otherwise the shoulder sitting in it inflates the threshold and
+ * swallows a gentle onset on the far side; (2) the scan on a clipped
+ * side uses a higher threshold (`clippedEdgeThresholdFraction`), since
+ * that side has no quiet tail and a low threshold would trip on the
+ * first sample.
  */
 
 import savitzkyGolay from 'ml-savitzky-golay';
@@ -61,6 +72,26 @@ export interface KneeDetectionOptions {
    *  above threshold before a knee is accepted, to reject single-sample
    *  noise spikes. Default: 3 */
   sustainCount?: number;
+  /** An edge region is only trusted as "flat noise" for the noise-floor
+   *  estimate if its largest normalized value stays at or below this
+   *  fraction of the histogram peak. Histograms are not guaranteed to
+   *  decay to zero at both boundaries - a channel can still hold several
+   *  percent of its pixels in the last bin - and pooling that falling
+   *  shoulder into the noise estimate inflates the threshold enough to
+   *  swallow a gentle onset on the opposite side. When one edge fails
+   *  this test the other edge alone is used; when both fail, the
+   *  noise-floor term is dropped and `minThresholdFraction` governs.
+   *  Default: 0.02 */
+  flatEdgeMaxFraction?: number;
+  /** Threshold used on a side whose edge region is NOT flat (i.e. the
+   *  histogram is clipped at that boundary, so the falling shoulder runs
+   *  right off the edge and there is no quiet tail to scan in from).
+   *  Expressed as a fraction of the peak derivative magnitude. It has to
+   *  be well above `minThresholdFraction`: the clipped tail still carries
+   *  real slope, and a low threshold would make the inward scan trip on
+   *  the very first sample. Only ever applied to the clipped side - the
+   *  opposite side keeps the noise-floor threshold. Default: 0.18 */
+  clippedEdgeThresholdFraction?: number;
 }
 
 export interface KneeResult {
@@ -75,7 +106,11 @@ export interface KneeResult {
   smoothed: number[];
   derivative: number[];
   derivativeMagnitude: number[];
-  threshold: number;
+  /** Derivative-magnitude threshold used for the left-side scan. */
+  leftThreshold: number;
+  /** Derivative-magnitude threshold used for the right-side scan. Differs
+   *  from `leftThreshold` only when exactly one edge is clipped. */
+  rightThreshold: number;
 }
 
 /** Ensure a window size is odd and at least `min`. */
@@ -126,6 +161,8 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
   const noiseThresholdMultiplier = options.noiseThresholdMultiplier ?? 5;
   const minThresholdFraction = options.minThresholdFraction ?? 0.05;
   const sustainCount = options.sustainCount ?? 3;
+  const flatEdgeMaxFraction = options.flatEdgeMaxFraction ?? 0.02;
+  const clippedEdgeThresholdFraction = options.clippedEdgeThresholdFraction ?? 0.18;
 
   const raw = counts.map((v) => Number(v) || 0);
 
@@ -150,25 +187,44 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
 
   // Estimate the noise floor from short, presumed-flat segments at both
   // edges (pooling both ends so an unusually quiet left or right side
-  // alone doesn't bias the estimate).
+  // alone doesn't bias the estimate) - but only from edges that are
+  // genuinely flat. A histogram clipped at a boundary (its last bin still
+  // several percent of the peak) has a falling shoulder sitting in that
+  // "edge" region; pooling it inflates the threshold and swallows a
+  // gentle onset on the far side.
+  const leftEdgeFlat = Math.max(...y.slice(0, edgeSampleCount)) <= flatEdgeMaxFraction;
+  const rightEdgeFlat = Math.max(...y.slice(n - edgeSampleCount)) <= flatEdgeMaxFraction;
   const edgeSamples = [
-    ...derivativeMagnitude.slice(0, edgeSampleCount),
-    ...derivativeMagnitude.slice(n - edgeSampleCount),
+    ...(leftEdgeFlat ? derivativeMagnitude.slice(0, edgeSampleCount) : []),
+    ...(rightEdgeFlat ? derivativeMagnitude.slice(n - edgeSampleCount) : []),
   ];
-  const mean = edgeSamples.reduce((a, b) => a + b, 0) / edgeSamples.length;
-  const variance =
-    edgeSamples.reduce((a, b) => a + (b - mean) * (b - mean), 0) / edgeSamples.length;
-  const std = Math.sqrt(variance);
-  const noiseFloorThreshold = mean + noiseThresholdMultiplier * std;
+  let noiseFloorThreshold = 0;
+  if (edgeSamples.length > 0) {
+    const mean = edgeSamples.reduce((a, b) => a + b, 0) / edgeSamples.length;
+    const variance =
+      edgeSamples.reduce((a, b) => a + (b - mean) * (b - mean), 0) / edgeSamples.length;
+    const std = Math.sqrt(variance);
+    noiseFloorThreshold = mean + noiseThresholdMultiplier * std;
+  }
 
   // The noise-floor threshold alone collapses to ~0 when the edge regions
   // are exactly flat (see `minThresholdFraction` doc comment), so floor it
   // against a fraction of the peak derivative magnitude.
   const maxDerivativeMagnitude = Math.max(...derivativeMagnitude, 0);
-  const threshold = Math.max(noiseFloorThreshold, minThresholdFraction * maxDerivativeMagnitude);
+  const flatThreshold = Math.max(noiseFloorThreshold, minThresholdFraction * maxDerivativeMagnitude);
 
-  const leftKnee = scanForOnset(derivativeMagnitude, 0, n - 1, 1, threshold, sustainCount);
-  const rightKnee = scanForOnset(derivativeMagnitude, n - 1, 0, -1, threshold, sustainCount);
+  // A clipped side has no quiet tail - its falling shoulder runs off the
+  // edge - so the low flat-region threshold would make the inward scan
+  // trip on the very first sample. Give that side (only) a higher bar.
+  const clippedThreshold = Math.max(
+    flatThreshold,
+    clippedEdgeThresholdFraction * maxDerivativeMagnitude
+  );
+  const leftThreshold = leftEdgeFlat ? flatThreshold : clippedThreshold;
+  const rightThreshold = rightEdgeFlat ? flatThreshold : clippedThreshold;
+
+  const leftKnee = scanForOnset(derivativeMagnitude, 0, n - 1, 1, leftThreshold, sustainCount);
+  const rightKnee = scanForOnset(derivativeMagnitude, n - 1, 0, -1, rightThreshold, sustainCount);
 
   return {
     leftKnee,
@@ -177,7 +233,8 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
     smoothed,
     derivative,
     derivativeMagnitude,
-    threshold,
+    leftThreshold,
+    rightThreshold,
   };
 }
 
