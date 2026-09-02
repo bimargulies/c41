@@ -38,5 +38,12 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/*.ccx
+          files: |
+            dist/*.ccx
+            scripts/install-ccx.sh
           generate_release_notes: true
+          body: |
+            **macOS install:** download the `.ccx` and `install-ccx.sh` into the
+            same folder, then run `bash install-ccx.sh` (drives Adobe's
+            UnifiedPluginInstallerAgent; needs a signed-in Creative Cloud desktop
+            app 5.7+). Or just double-click the `.ccx`.
