@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #
-# Build, package, and install the C41 UXP plugin into Photoshop on macOS via
-# Adobe's UnifiedPluginInstallerAgent (also --package / --remove / --list).
+# Local-development convenience: build + package the C41 plugin and install it
+# into Photoshop on macOS in one step. The actual install is delegated to
+# install-ccx.sh (the same standalone installer shipped with releases), which
+# drives Adobe's UnifiedPluginInstallerAgent.
 #
-# The agent forwards to the Creative Cloud desktop app, so this can't get
-# around a broken CCD install. It has fixed the "status = -267 / failed to
-# generate mxi" failure though: `pnpm package` (used here) builds with
-# vite-uxp-plugin's package mode, which collapses the manifest's single-host
-# array to an object, which the CCD installer needs. See the README's
-# "Why `pnpm run package`" section.
+# `pnpm run package` builds with vite-uxp-plugin's package mode, which collapses
+# the manifest's single-host array to an object - the Creative Cloud installer
+# needs that (see the README's "Why `pnpm run package`" section).
 #
 # Usage:
 #   scripts/install-macos.sh                 build + package + install
@@ -18,30 +17,19 @@
 #   scripts/install-macos.sh --list          list installed UXP plugins for all Adobe apps
 #
 # Requirements:
-#   - Creative Cloud desktop app 5.7 or newer
-#   - Signed in with the Adobe ID entitled to the plugin
-#   - pnpm on PATH (only for the build/package path)
+#   - Creative Cloud desktop app 5.7 or newer, signed in with an entitled Adobe ID
+#   - pnpm on PATH (only for the build/package paths)
 
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-plugin_name="C41 tools"   # must match "name" in uxp.config.ts
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
 ccx="$repo_root/c41.ccx"
-agent="/Library/Application Support/Adobe/Adobe Desktop Common/RemoteComponents/UPI/UnifiedPluginInstallerAgent/UnifiedPluginInstallerAgent.app/Contents/MacOS/UnifiedPluginInstallerAgent"
-
-if [[ ! -x "$agent" ]]; then
-	echo "error: UnifiedPluginInstallerAgent not found at:" >&2
-	echo "  $agent" >&2
-	echo "Install or update the Creative Cloud desktop app (5.7+) and retry." >&2
-	exit 1
-fi
+installer="$script_dir/install-ccx.sh"
 
 case "${1:-}" in
-	--list)
-		exec "$agent" --list all
-		;;
-	--remove)
-		exec "$agent" --remove "$plugin_name"
+	--list | --remove)
+		exec bash "$installer" "$1"
 		;;
 	--package)
 		exec pnpm --dir "$repo_root" run package "$ccx"
@@ -54,16 +42,4 @@ case "${1:-}" in
 		;;
 esac
 
-if [[ ! -f "$ccx" ]]; then
-	echo "error: no such file: $ccx" >&2
-	exit 1
-fi
-
-echo "==> Installing $ccx"
-"$agent" --install "$ccx"
-
-echo "==> Installed plugins"
-"$agent" --list all || true
-
-echo
-echo "Done. Restart Photoshop if it was running."
+exec bash "$installer" "$ccx"

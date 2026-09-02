@@ -105,11 +105,13 @@ To install without Developer Mode you need a `.ccx` package. Build one with:
 pnpm run package        # writes ./c41.ccx
 ```
 
-Then double-click `c41.ccx` to install it via the Creative Cloud desktop app, or download the `.ccx`
-attached to a [release](../../releases). On macOS, `scripts/install-macos.sh` does the build +
-package + install in one step (and `scripts/install-macos.sh --remove` / `--list`), driving Adobe's
-bundled `UnifiedPluginInstallerAgent`; you must be signed into the Creative Cloud desktop app (5.7+)
-with an entitled Adobe ID.
+Then double-click `c41.ccx` to install it via the Creative Cloud desktop app.
+
+Each [release](../../releases) also attaches the `.ccx` plus `install-ccx.sh`. Download both into one
+folder and run `bash install-ccx.sh` (also `--remove` / `--list`) — a standalone macOS installer that
+drives Adobe's bundled `UnifiedPluginInstallerAgent`, no repo checkout needed. For local development,
+`scripts/install-macos.sh` does build + package + install in one step. Either way you must be signed
+into the Creative Cloud desktop app (5.7+) with an entitled Adobe ID.
 
 Packaging from the UXP Developer Tool (`...` menu → **Package**) also works.
 
