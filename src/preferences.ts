@@ -7,11 +7,15 @@ const LEVELS_MODES: readonly LevelsMode[] = ['threshold', 'extreme', 'knee detec
 export interface Preferences {
 	detectionMethod: LevelsMode;
 	threshold: number;
+	/** When true, a Screen-blended Curves layer is added below the Invert
+	 *  layer to lift a linear/raw scan before inversion. */
+	correctGammaForRawScans: boolean;
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
 	detectionMethod: 'knee detection',
 	threshold: 0,
+	correctGammaForRawScans: false,
 };
 
 export function getPreferences(): Preferences {
@@ -24,6 +28,7 @@ export function getPreferences(): Preferences {
 		if (!LEVELS_MODES.includes(merged.detectionMethod)) {
 			merged.detectionMethod = DEFAULT_PREFERENCES.detectionMethod;
 		}
+		merged.correctGammaForRawScans = merged.correctGammaForRawScans === true;
 		return merged;
 	} catch {
 		return { ...DEFAULT_PREFERENCES };
@@ -91,6 +96,10 @@ export async function openC41Preferences() {
 			<label class="row">
 			    (Threshold percentage is only used when "threshold" is selected above.)
 			</label>
+			<label class="row">
+				<input type="checkbox" id="correctGamma" ${prefs.correctGammaForRawScans ? "checked" : ""} />
+				Correct gamma for raw scans.
+			</label>
 			<div class="buttons">
 				<button id="cancelPreferences" type="button">Cancel</button>
 				<button id="okPreferences" type="button">OK</button>
@@ -105,6 +114,7 @@ export async function openC41Preferences() {
 			const thresholdInput = dialog.querySelector<HTMLInputElement>('#threshold')!;
 			const thresholdError = dialog.querySelector<HTMLDivElement>('#thresholdError')!;
 			const detectionMethod = dialog.querySelector<HTMLInputElement>('input[name="levelsMode"]:checked')!.value as LevelsMode;
+			const correctGammaForRawScans = dialog.querySelector<HTMLInputElement>('#correctGamma')!.checked;
 			const threshold = Number(thresholdInput.value);
 
 			if (detectionMethod === 'threshold' && (thresholdInput.value.trim() === '' || !Number.isFinite(threshold) || threshold < 0 || threshold > 100)) {
@@ -113,14 +123,18 @@ export async function openC41Preferences() {
 			}
 			thresholdError.textContent = '';
 
-			setPreferences({ detectionMethod, threshold: Number.isFinite(threshold) ? threshold : prefs.threshold });
+			setPreferences({
+				detectionMethod,
+				correctGammaForRawScans,
+				threshold: Number.isFinite(threshold) ? threshold : prefs.threshold,
+			});
 			dialog.close();
 		});
 
 		await dialog.uxpShowModal({
 			title: 'C41 Preferences',
 			resize: 'none',
-			size: { width: 480, height: 300 },
+			size: { width: 480, height: 340 },
 		});
 	} finally {
 		dialog.remove();
