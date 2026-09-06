@@ -235,7 +235,6 @@ describe('getKneeLimitsFromHistogram', () => {
 		smoothed: [],
 		derivative: [],
 		derivativeMagnitude: [],
-		leftThreshold: 0,
 		rightThreshold: 0,
 		lagCorrection: 0,
 	});
