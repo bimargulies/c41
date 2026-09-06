@@ -1,5 +1,10 @@
 const PREFERENCES_KEY = 'c41.preferences';
 
+/** Description of the linear ICC profile bundled with the plugin (see
+ *  public/sRGB-elle-V4-g10.icc and the "Install linear scan profile" command).
+ *  This is the string Photoshop matches on. */
+export const BUNDLED_LINEAR_PROFILE = 'sRGB-elle-V4-g10.icc';
+
 export type LevelsMode = 'extreme' | 'knee detection';
 
 const LEVELS_MODES: readonly LevelsMode[] = ['extreme', 'knee detection'];
@@ -18,7 +23,7 @@ export interface Preferences {
 const DEFAULT_PREFERENCES: Preferences = {
 	detectionMethod: 'knee detection',
 	correctGammaForRawScans: false,
-	linearProfileName: '',
+	linearProfileName: BUNDLED_LINEAR_PROFILE,
 };
 
 export function getPreferences(): Preferences {
@@ -31,7 +36,10 @@ export function getPreferences(): Preferences {
 				? stored.detectionMethod
 				: DEFAULT_PREFERENCES.detectionMethod,
 			correctGammaForRawScans: stored.correctGammaForRawScans === true,
-			linearProfileName: typeof stored.linearProfileName === 'string' ? stored.linearProfileName : '',
+			linearProfileName:
+				typeof stored.linearProfileName === 'string'
+					? stored.linearProfileName
+					: DEFAULT_PREFERENCES.linearProfileName,
 		};
 	} catch {
 		return { ...DEFAULT_PREFERENCES };
@@ -97,7 +105,7 @@ export async function openC41Preferences() {
 					Linear scan profile:
 					<input type="text" id="linearProfile" value="${escapeHtml(prefs.linearProfileName)}" placeholder="installed ICC profile name" />
 				</label>
-				<span class="hint">Assigned to the scan, then Convert to Profile → Working RGB.</span>
+				<span class="hint">Assigned to the scan, then Convert to Profile → Working RGB. Run <b>Install linear scan profile</b> once to install the bundled default.</span>
 			</div>
 			<div class="buttons">
 				<button id="cancelPreferences" type="button">Cancel</button>

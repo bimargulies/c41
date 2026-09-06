@@ -24,17 +24,17 @@ afterEach(() => {
 
 describe('getPreferences', () => {
 	it('returns defaults when nothing is stored', () => {
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: 'sRGB-elle-V4-g10.icc' });
 	});
 
 	it('reads a stored detection method and gamma flag', () => {
 		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'extreme', correctGammaForRawScans: true }));
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', correctGammaForRawScans: true, linearProfileName: '' });
+		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', correctGammaForRawScans: true, linearProfileName: 'sRGB-elle-V4-g10.icc' });
 	});
 
 	it('falls back to defaults on corrupt stored JSON', () => {
 		localStorage.setItem('c41.preferences', '{not json');
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: 'sRGB-elle-V4-g10.icc' });
 	});
 
 	it('falls back to the default method when the stored value is not a recognized mode', () => {
@@ -53,12 +53,17 @@ describe('getPreferences', () => {
 		expect(getPreferences().correctGammaForRawScans).toBe(false);
 	});
 
-	it('reads a stored linearProfileName and coerces a non-string to empty', () => {
+	it('keeps a stored string linearProfileName (including empty), else uses the bundled default', () => {
 		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: 'My Linear RGB' }));
 		expect(getPreferences().linearProfileName).toBe('My Linear RGB');
 
-		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: 42 }));
+		// An explicit empty string is a valid choice (disables the conversion).
+		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: '' }));
 		expect(getPreferences().linearProfileName).toBe('');
+
+		// A non-string falls back to the bundled profile.
+		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: 42 }));
+		expect(getPreferences().linearProfileName).toBe('sRGB-elle-V4-g10.icc');
 	});
 });
 
@@ -110,7 +115,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: 'sRGB-elle-V4-g10.icc' });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
@@ -122,7 +127,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLButtonElement>('#cancelPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: 'sRGB-elle-V4-g10.icc' });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 });

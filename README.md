@@ -15,6 +15,12 @@ preferences) followed by Convert to Profile — which applies the exact linear�
 before the inversion. This rewrites the base image's pixels, so it requires a 16- or 32-bit
 document; the command aborts with a message otherwise.
 
+The plugin bundles a linear sRGB profile for this. Run **Install linear scan profile** once (it
+copies the profile into `~/Library/ColorSync/Profiles` on macOS), restart Photoshop, and the
+default **Linear scan profile** preference (`sRGB-elle-V4-g10.icc`) will resolve. On other
+platforms install the file — `sRGB-elle-V4-g10.icc` in the plugin folder — into your system
+colour-profile directory by hand.
+
 Everything is done in a single undoable step.
 
 How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
@@ -109,7 +115,15 @@ comes from `apiVersion: 2` / `manifestVersion: 5` (~Photoshop 24.2+).
 
 ## License
 
-[BSD 3-Clause](./LICENSE)
+The plugin is [BSD 3-Clause](./LICENSE).
+
+The bundled linear ICC profile, **`sRGB-elle-V4-g10.icc`**, is from
+[Elle Stone's Well-Behaved ICC Profiles](https://github.com/ellelstone/elles_icc_profiles)
+(Copyright 2016, Elle Stone, <http://ninedegreesbelow.com/>) and is included **unmodified** under the
+**Creative Commons Attribution-ShareAlike 3.0 Unported** license
+(<https://creativecommons.org/licenses/by-sa/3.0/legalcode>). Full text and attribution notice:
+[`public/licenses/`](./public/licenses/). CC BY-SA applies to that profile file (and any modified
+profile derived from it), not to the rest of the plugin — bundling it as-is is a mere aggregation.
 
 ## AI usage
 
