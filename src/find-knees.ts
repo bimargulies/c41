@@ -43,6 +43,15 @@
  * rejected when substantial mass remains outside it
  * (`spuriousKneeMassFraction`) and the clipped boundary is used instead
  * (i.e. don't clip that side at all).
+ *
+ * GENTLE LEFT RAMPS: some channels climb so slowly off the toe that the
+ * derivative never gets big enough to trip the scan until the ramp
+ * finally steepens, far past the black point. The left knee is therefore
+ * also floored at where the raw normalized histogram first reaches
+ * `onsetLevelFraction` - simply where it lifts off the near-zero toe -
+ * and the earlier of the two wins. The right side gets no counterpart: a
+ * level rule there fights the channels whose wanted knee sits partway up
+ * a steep shoulder rather than at the floor.
  */
 
 import savitzkyGolay from 'ml-savitzky-golay';
@@ -115,12 +124,23 @@ export interface KneeDetectionOptions {
    *  knee is rejected: on a clipped edge the boundary is used instead (no
    *  clipping on that side), otherwise no knee is reported. Default: 0.15 */
   spuriousKneeMassFraction?: number;
+  /** Left-knee floor, as a fraction of the peak. On a channel whose left
+   *  shoulder is a very long, gentle ramp, the derivative never gets big
+   *  enough to trip the scan until the ramp finally steepens, far past
+   *  where a human would put the black point - which is simply where the
+   *  curve first lifts off the near-zero toe. So the left knee is also
+   *  capped at the first bin where the (unsmoothed) normalized histogram
+   *  reaches this fraction, and the earlier of the two wins. Right knees
+   *  get no equivalent: a level rule there fights the cases where the
+   *  wanted knee sits partway up a cliff. Default: 0.002 */
+  onsetLevelFraction?: number;
 }
 
 export interface KneeResult {
   /** Index (histogram level, e.g. 0-255) of the first sharp bend scanning
-   *  in from the left. Null if none found above the noise floor, or if the
-   *  bend found was rejected as spurious (see `spuriousKneeMassFraction`)
+   *  in from the left - or, if earlier, the toe lift-off point
+   *  (`onsetLevelFraction`). Null if none found above the noise floor, or
+   *  if the bend was rejected as spurious (see `spuriousKneeMassFraction`)
    *  and the left edge is not clipped; 0 if rejected and it is clipped. */
   leftKnee: number | null;
   /** Index of the first sharp bend scanning in from the right. Null / the
@@ -194,6 +214,7 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
   const clippedEdgeThresholdFraction = options.clippedEdgeThresholdFraction ?? 0.18;
   const lagCorrection = options.lagCorrection ?? Math.round(windowSize / 4);
   const spuriousKneeMassFraction = options.spuriousKneeMassFraction ?? 0.15;
+  const onsetLevelFraction = options.onsetLevelFraction ?? 0.002;
 
   const raw = counts.map((v) => Number(v) || 0);
 
@@ -290,8 +311,22 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
       ? Math.max(0, rawKnee - lagCorrection)
       : Math.min(n - 1, rawKnee - lagCorrection);
   };
-  const leftKnee = settle(rawLeftKnee, 'left', leftEdgeFlat);
+  let leftKnee = settle(rawLeftKnee, 'left', leftEdgeFlat);
   const rightKnee = settle(rawRightKnee, 'right', rightEdgeFlat);
+
+  // Onset floor: on a channel with a very long, gentle left ramp the scan
+  // above only trips once the ramp steepens, well past the black point. Cap
+  // the left knee at where the raw normalized curve first clears
+  // `onsetLevelFraction` - the earlier of the two wins. Only meaningful with
+  // a genuinely quiet toe, so skip a clipped left edge.
+  if (leftKnee != null && leftEdgeFlat) {
+    for (let i = 0; i < leftKnee; i++) {
+      if (y[i] >= onsetLevelFraction) {
+        leftKnee = i;
+        break;
+      }
+    }
+  }
 
   return {
     leftKnee,
