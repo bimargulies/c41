@@ -1,6 +1,6 @@
-import { entrypoints } from "uxp";
+import { entrypoints, os, storage } from "uxp";
 import { action, app, constants, imaging } from "adobe:photoshop";
-import { getPreferences, openC41Preferences } from "./preferences";
+import { BUNDLED_LINEAR_PROFILE, getPreferences, openC41Preferences } from "./preferences";
 import { getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./export-histograms";
 
@@ -97,6 +97,44 @@ async function exportChannelHistograms() {
   }
 }
 
+// Copy the bundled linear profile (public/sRGB-elle-V4-g10.icc) into the user's
+// ColorSync profile folder so Photoshop can find it by name. Photoshop only
+// scans that folder at launch, hence the "restart" in the message.
+async function installLinearProfile() {
+  try {
+    const fs = storage.localFileSystem;
+    const src = await (await fs.getPluginFolder()).getEntry(BUNDLED_LINEAR_PROFILE);
+
+    if (os.platform() !== "darwin") {
+      await app.showAlert(
+        `Automatic install is macOS only. The profile file is at:\n${src.nativePath}\n\n` +
+          `Install it into your system colour-profile folder, restart Photoshop, then ` +
+          `set "Linear scan profile" in C41 Preferences to "${BUNDLED_LINEAR_PROFILE}".`,
+      );
+      return;
+    }
+
+    type Folder = Parameters<typeof src.copyTo>[0];
+    const colorSync = (await fs.getEntryWithUrl(`file:${os.homedir()}/Library/ColorSync`)) as Folder;
+    const dest =
+      ((await colorSync.getEntry("Profiles").catch(() => null)) as Folder | null) ??
+      ((await colorSync.createFolder("Profiles")) as Folder);
+    await src.copyTo(dest, { overwrite: true });
+    await app.showAlert(
+      `Installed "${BUNDLED_LINEAR_PROFILE}" to ~/Library/ColorSync/Profiles.\n\n` +
+        `Quit and reopen Photoshop for it to become available, then use ` +
+        `"Correct gamma for raw scans".`,
+    );
+  } catch (err) {
+    console.error("[c41] installLinearProfile: failed", err);
+    await app.showAlert(
+      `Couldn't install the linear profile automatically (${err}).\n\n` +
+        `Copy it in by hand: the file is in the plugin folder as ` +
+        `"${BUNDLED_LINEAR_PROFILE}"; put it in ~/Library/ColorSync/Profiles, then restart Photoshop.`,
+    );
+  }
+}
+
 // Turn a linear/raw scan into the working space before inversion: tag the
 // document with the linear capture profile, then Convert to Profile to the
 // working RGB space, which applies the exact linear -> working transfer curve
@@ -107,7 +145,10 @@ async function correctRawScanGamma(linearProfileName: string) {
   doc.colorProfileName = linearProfileName;
   if (doc.colorProfileType === constants.ColorProfileType.NONE) {
     throw new UserError(
-      `"${linearProfileName}" isn't an installed ICC profile - check the name in C41 Preferences.`,
+      linearProfileName === BUNDLED_LINEAR_PROFILE
+        ? `The linear scan profile isn't installed yet. Run "Install linear scan profile" ` +
+          `(Plugins › C41 tools), restart Photoshop, then try again.`
+        : `"${linearProfileName}" isn't an installed ICC profile - check the name in C41 Preferences.`,
     );
   }
   try {
@@ -214,5 +255,6 @@ entrypoints.setup({
     addC41AdjustmentLayers: addC41AdjustmentLayers,
     exportChannelHistograms: exportChannelHistograms,
     openC41Preferences: openC41Preferences,
+    installLinearProfile: installLinearProfile,
   },
 } as unknown as Parameters<typeof entrypoints.setup>[0]);
