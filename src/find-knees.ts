@@ -38,7 +38,11 @@
  * swallows a gentle onset on the far side; (2) the scan on a clipped
  * side uses a higher threshold (`clippedEdgeThresholdFraction`), since
  * that side has no quiet tail and a low threshold would trip on the
- * first sample.
+ * first sample; (3) if the scan still latches onto interior structure -
+ * a secondary lobe left of a clipped right edge, say - the knee is
+ * rejected when substantial mass remains outside it
+ * (`spuriousKneeMassFraction`) and the clipped boundary is used instead
+ * (i.e. don't clip that side at all).
  */
 
 import savitzkyGolay from 'ml-savitzky-golay';
@@ -103,14 +107,24 @@ export interface KneeDetectionOptions {
    *  find-knees.test.ts). Applied to both ends equally, after the scan.
    *  Default: round(windowSize / 4). Set to 0 to get the raw crossing. */
   lagCorrection?: number;
+  /** A detected knee is only a real black/white point if the histogram is
+   *  "spent" past it - everything from the knee out to that edge is small.
+   *  If the smoothed curve anywhere outside the knee still exceeds this
+   *  fraction of the peak, the scan latched onto interior structure (a
+   *  secondary lobe, a sub-shoulder) rather than the shoulder, and the
+   *  knee is rejected: on a clipped edge the boundary is used instead (no
+   *  clipping on that side), otherwise no knee is reported. Default: 0.15 */
+  spuriousKneeMassFraction?: number;
 }
 
 export interface KneeResult {
   /** Index (histogram level, e.g. 0-255) of the first sharp bend scanning
-   *  in from the left. Null if none found above the noise floor. */
+   *  in from the left. Null if none found above the noise floor, or if the
+   *  bend found was rejected as spurious (see `spuriousKneeMassFraction`)
+   *  and the left edge is not clipped; 0 if rejected and it is clipped. */
   leftKnee: number | null;
-  /** Index of the first sharp bend scanning in from the right. Null if
-   *  none found above the noise floor. */
+  /** Index of the first sharp bend scanning in from the right. Null / the
+   *  last index under the same conditions as `leftKnee`. */
   rightKnee: number | null;
   /** Intermediate arrays, exposed for debugging/plotting in your plugin UI. */
   normalized: number[];
@@ -179,6 +193,7 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
   const flatEdgeMaxFraction = options.flatEdgeMaxFraction ?? 0.02;
   const clippedEdgeThresholdFraction = options.clippedEdgeThresholdFraction ?? 0.18;
   const lagCorrection = options.lagCorrection ?? Math.round(windowSize / 4);
+  const spuriousKneeMassFraction = options.spuriousKneeMassFraction ?? 0.15;
 
   const raw = counts.map((v) => Number(v) || 0);
 
@@ -242,13 +257,41 @@ export function findKnees(counts: number[], options: KneeDetectionOptions = {}):
   const rawLeftKnee = scanForOnset(derivativeMagnitude, 0, n - 1, 1, leftThreshold, sustainCount);
   const rawRightKnee = scanForOnset(derivativeMagnitude, n - 1, 0, -1, rightThreshold, sustainCount);
 
+  // A real black/white-point knee has the histogram spent past it: from the
+  // knee out to that edge, the (smoothed) curve stays small. If it doesn't -
+  // a secondary lobe or sub-shoulder sits outside the detected knee - the
+  // scan latched onto interior structure, not the shoulder. The guard band
+  // skips the smoothing-blurred transition right at the knee itself.
+  const guard = Math.round(windowSize / 2);
+  const structureOutside = (knee: number, side: 'left' | 'right'): boolean => {
+    const lo = side === 'left' ? 0 : Math.min(n - 1, knee + guard);
+    const hi = side === 'left' ? Math.max(0, knee - guard) : n - 1;
+    for (let i = lo; i <= hi; i++) {
+      if (smoothed[i] > spuriousKneeMassFraction) return true;
+    }
+    return false;
+  };
+
   // Savitzky-Golay smoothing (and the asymmetric post-padding) biases the
   // threshold crossing a few samples above the corner a human would pick
   // - and, measured against the real-scan corpus in the test file, by
   // about the same amount on both ends. Subtract one window-derived
   // constant from each knee.
-  const leftKnee = rawLeftKnee == null ? null : Math.max(0, rawLeftKnee - lagCorrection);
-  const rightKnee = rawRightKnee == null ? null : Math.min(n - 1, rawRightKnee - lagCorrection);
+  const settle = (
+    rawKnee: number | null,
+    side: 'left' | 'right',
+    edgeFlat: boolean,
+  ): number | null => {
+    if (rawKnee == null) return null;
+    // Rejected as spurious: a clipped edge means the data runs off the
+    // boundary, so keep the boundary; otherwise report no knee.
+    if (structureOutside(rawKnee, side)) return edgeFlat ? null : side === 'left' ? 0 : n - 1;
+    return side === 'left'
+      ? Math.max(0, rawKnee - lagCorrection)
+      : Math.min(n - 1, rawKnee - lagCorrection);
+  };
+  const leftKnee = settle(rawLeftKnee, 'left', leftEdgeFlat);
+  const rightKnee = settle(rawRightKnee, 'right', rightEdgeFlat);
 
   return {
     leftKnee,
