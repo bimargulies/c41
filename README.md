@@ -1,7 +1,7 @@
 # c41
 
 A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film. Its one command,
-**Add C41 Adjustment Layers**, adds two adjustment layers to the active document:
+**Add C41 Adjustment Layers**, adds these adjustment layers to the active document:
 
 1. **Invert** — the bottom layer, switching from negative to positive.
 2. **Levels** — directly above Invert. For each of the red, green, and blue channels, the input
@@ -9,7 +9,11 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film.
    auto-contrast per channel). This cancels out the orange film-base mask and color cast typical of
    C-41 negative scans.
 
-Both layers are added in a single undoable step.
+If **Correct gamma for raw scans** is enabled in preferences, a third layer — **Correct gamma for
+raw scan**, a Screen-blended Curves layer — is added *below* Invert, to lift a linear/raw scan
+before it is inverted.
+
+All layers are added in a single undoable step.
 
 How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
 there are three methods:

@@ -95,6 +95,24 @@ async function exportChannelHistograms() {
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
   await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
+    // Each `make adjustmentLayer` stacks above the previously active layer, so
+    // creating this first puts it below Invert - a Screen-blended Curves layer
+    // that lifts a linear/raw scan before it is inverted.
+    if (prefs.correctGammaForRawScans) {
+      await batchPlayModifying({
+        _obj: "make",
+        _target: [{ _ref: "adjustmentLayer" }],
+        using: {
+          _obj: "adjustmentLayer",
+          name: "Correct gamma for raw scan",
+          mode: { _enum: "blendMode", _value: "screen" },
+          type: {
+            _obj: "curves",
+          },
+        },
+      });
+    }
+
     await batchPlayModifying({
       _obj: "make",
       _target: [{ _ref: "adjustmentLayer" }],
