@@ -9,11 +9,13 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film.
    the range is measured is configurable — see below). This cancels out the orange film-base mask
    and color cast typical of C-41 negative scans.
 
-If **Correct gamma for raw scans** is enabled in preferences, a third layer — **Correct gamma for
-raw scan**, a Screen-blended Curves layer — is added *below* Invert, to lift a linear/raw scan
-before it is inverted.
+If **Correct gamma for raw scans** is enabled in preferences, the scan is first color-converted from
+a linear source profile to the working RGB space — Assign Profile (to the ICC profile named in
+preferences) followed by Convert to Profile — which applies the exact linear→working transfer curve
+before the inversion. This rewrites the base image's pixels, so it requires a 16- or 32-bit
+document; the command aborts with a message otherwise.
 
-All layers are added in a single undoable step.
+Everything is done in a single undoable step.
 
 How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
 there are two methods:
