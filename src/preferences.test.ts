@@ -24,17 +24,17 @@ afterEach(() => {
 
 describe('getPreferences', () => {
 	it('returns defaults when nothing is stored', () => {
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
 	});
 
 	it('reads a stored detection method and gamma flag', () => {
 		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'extreme', correctGammaForRawScans: true }));
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', correctGammaForRawScans: true });
+		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', correctGammaForRawScans: true, linearProfileName: '' });
 	});
 
 	it('falls back to defaults on corrupt stored JSON', () => {
 		localStorage.setItem('c41.preferences', '{not json');
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
 	});
 
 	it('falls back to the default method when the stored value is not a recognized mode', () => {
@@ -52,11 +52,23 @@ describe('getPreferences', () => {
 		localStorage.setItem('c41.preferences', JSON.stringify({ correctGammaForRawScans: 'yes' }));
 		expect(getPreferences().correctGammaForRawScans).toBe(false);
 	});
+
+	it('reads a stored linearProfileName and coerces a non-string to empty', () => {
+		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: 'My Linear RGB' }));
+		expect(getPreferences().linearProfileName).toBe('My Linear RGB');
+
+		localStorage.setItem('c41.preferences', JSON.stringify({ linearProfileName: 42 }));
+		expect(getPreferences().linearProfileName).toBe('');
+	});
 });
 
 describe('openC41Preferences', () => {
 	it('pre-fills the form from the currently stored preferences', async () => {
-		localStorage.setItem('c41.preferences', JSON.stringify({ detectionMethod: 'extreme', correctGammaForRawScans: true }));
+		localStorage.setItem('c41.preferences', JSON.stringify({
+			detectionMethod: 'extreme',
+			correctGammaForRawScans: true,
+			linearProfileName: 'My Linear RGB',
+		}));
 
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
@@ -64,21 +76,27 @@ describe('openC41Preferences', () => {
 		expect(dialog.querySelector<HTMLInputElement>('#modeExtreme')!.checked).toBe(true);
 		expect(dialog.querySelector<HTMLInputElement>('#modeKneeDetection')!.checked).toBe(false);
 		expect(dialog.querySelector<HTMLInputElement>('#correctGamma')!.checked).toBe(true);
+		expect(dialog.querySelector<HTMLInputElement>('#linearProfile')!.value).toBe('My Linear RGB');
 
 		dialog.close();
 		await opened;
 	});
 
-	it('saves extreme mode and the gamma checkbox when OK is clicked', async () => {
+	it('saves extreme mode, the gamma checkbox, and the profile name when OK is clicked', async () => {
 		const opened = openC41Preferences();
 		const dialog = document.querySelector('dialog')!;
 
 		dialog.querySelector<HTMLInputElement>('#modeExtreme')!.checked = true;
 		dialog.querySelector<HTMLInputElement>('#correctGamma')!.checked = true;
+		dialog.querySelector<HTMLInputElement>('#linearProfile')!.value = 'My Linear RGB';
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'extreme', correctGammaForRawScans: true });
+		expect(getPreferences()).toEqual({
+			detectionMethod: 'extreme',
+			correctGammaForRawScans: true,
+			linearProfileName: 'My Linear RGB',
+		});
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
@@ -92,7 +110,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLButtonElement>('#okPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 
@@ -104,7 +122,7 @@ describe('openC41Preferences', () => {
 		dialog.querySelector<HTMLButtonElement>('#cancelPreferences')!.click();
 		await opened;
 
-		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false });
+		expect(getPreferences()).toEqual({ detectionMethod: 'knee detection', correctGammaForRawScans: false, linearProfileName: '' });
 		expect(document.querySelector('dialog')).toBeNull();
 	});
 });

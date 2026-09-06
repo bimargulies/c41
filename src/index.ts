@@ -1,5 +1,5 @@
 import { entrypoints } from "uxp";
-import { action, app, imaging } from "adobe:photoshop";
+import { action, app, constants, imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
 import { getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./export-histograms";
@@ -72,6 +72,10 @@ async function getChannelLimitValues(): Promise<AllLimitValues> {
   }
 }
 
+// Raised for a condition the user can fix (wrong bit depth, missing profile
+// name); shown to them verbatim instead of just logged.
+class UserError extends Error {}
+
 async function addC41AdjustmentLayers() {
   console.log("[c41] addC41AdjustmentLayers: start");
   try {
@@ -79,6 +83,7 @@ async function addC41AdjustmentLayers() {
     console.log("[c41] addC41AdjustmentLayers: done");
   } catch (err) {
     console.error("[c41] addC41AdjustmentLayers: failed", err);
+    await app.showAlert(err instanceof UserError ? err.message : `C41 tools: ${err}`);
   }
 }
 
@@ -92,25 +97,50 @@ async function exportChannelHistograms() {
   }
 }
 
+// Turn a linear/raw scan into the working space before inversion: tag the
+// document with the linear capture profile, then Convert to Profile to the
+// working RGB space, which applies the exact linear -> working transfer curve
+// (unlike the old Screen-blended Curves layer, which only approximated it).
+// This rewrites the base image's pixels, so it needs 16- or 32-bit precision.
+async function correctRawScanGamma(linearProfileName: string) {
+  const doc = app.activeDocument;
+  doc.colorProfileName = linearProfileName;
+  if (doc.colorProfileType === constants.ColorProfileType.NONE) {
+    throw new UserError(
+      `"${linearProfileName}" isn't an installed ICC profile - check the name in C41 Preferences.`,
+    );
+  }
+  try {
+    await doc.convertProfile("Working RGB", constants.Intent.RELATIVECOLORIMETRIC, true);
+  } catch (err) {
+    throw new UserError(
+      `Couldn't convert from "${linearProfileName}" to the working space (${err}).`,
+    );
+  }
+}
+
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
+
+  if (prefs.correctGammaForRawScans) {
+    const bits = app.activeDocument.bitsPerChannel;
+    if (bits !== constants.BitsPerChannelType.SIXTEEN && bits !== constants.BitsPerChannelType.THIRTYTWO) {
+      throw new UserError(
+        '"Correct gamma for raw scans" rewrites pixel data and needs a 16- or 32-bit document ' +
+          "(Image › Mode). No layers were added.",
+      );
+    }
+    if (!prefs.linearProfileName.trim()) {
+      throw new UserError(
+        'Set the linear scan profile name in C41 Preferences to use "Correct gamma for raw scans". ' +
+          "No layers were added.",
+      );
+    }
+  }
+
   await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
-    // Each `make adjustmentLayer` stacks above the previously active layer, so
-    // creating this first puts it below Invert - a Screen-blended Curves layer
-    // that lifts a linear/raw scan before it is inverted.
     if (prefs.correctGammaForRawScans) {
-      await batchPlayModifying({
-        _obj: "make",
-        _target: [{ _ref: "adjustmentLayer" }],
-        using: {
-          _obj: "adjustmentLayer",
-          name: "Correct gamma for raw scan",
-          mode: { _enum: "blendMode", _value: "screen" },
-          type: {
-            _obj: "curves",
-          },
-        },
-      });
+      await correctRawScanGamma(prefs.linearProfileName.trim());
     }
 
     await batchPlayModifying({
