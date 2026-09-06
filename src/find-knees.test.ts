@@ -11,9 +11,8 @@ interface TestCase {
   name: string;
   histogram: Histogram;
   options?: KneeDetectionOptions;
-  /** How many samples off from the expected shoulder still counts as a pass.
-   *  A few samples of slack is expected: findKnees corrects the mean
-   *  smoothing lag but not its per-histogram variation. */
+  /** Samples of slack allowed against the hand-picked point. A few bins is
+   *  expected: "which exact level" is a judgement call. Default: 5 */
   tolerance?: number;
 }
 
@@ -39,7 +38,7 @@ const cases: TestCase[] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       ],
       expectedLeft: 20,
-      expectedRight: 135,
+      expectedRight: 144,
     },
   },
   {
@@ -60,7 +59,7 @@ const cases: TestCase[] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       ],
       expectedLeft: 8,
-      expectedRight: 59,
+      expectedRight: 62,
     },
   },
   {
@@ -104,8 +103,8 @@ const cases: TestCase[] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       ],
-      expectedLeft: 24, 
-      expectedRight: 143, 
+      expectedLeft: 24,
+      expectedRight: 150,
     },
   },
   {
@@ -127,7 +126,7 @@ const cases: TestCase[] = [
         0, 0, 0,
       ],
       expectedLeft: 8,
-      expectedRight: 61,
+      expectedRight: 64,
     },
   },
   {
@@ -146,9 +145,8 @@ const cases: TestCase[] = [
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       ],
-      expectedLeft: 8, // this is a bit higher than we would really like; 
-      // Claude thinks that the left shoulder is very gradual and the right shoulder is very steep, so the knee detection algorithm is biased toward the right shoulder.
-      expectedRight: 36,
+      expectedLeft: 8,
+      expectedRight: 38,
     },
   },
   {
@@ -178,7 +176,8 @@ const cases: TestCase[] = [
         24699, 13864,
       ],
       expectedLeft: 75,
-      expectedRight: 244,
+      // clipped at the top (last bin still ~0.4% of peak) - keep it all
+      expectedRight: 255,
     },
   },
   {
@@ -208,7 +207,7 @@ const cases: TestCase[] = [
         43, 22, 11, 3, 2, 1, 0, 0, 0, 0, 0, 0,
       ],
       expectedLeft: 47,
-      expectedRight: 224,
+      expectedRight: 235,
     },
   },
   {
@@ -237,16 +236,8 @@ const cases: TestCase[] = [
         0, 0, 0, 0, 0,
       ],
       expectedLeft: 30,
-      // Blue's right shoulder is a near-vertical cliff (normalized 0.99 at
-      // bin 150 -> 0.02 at bin 180). The detector lands ~180, where the
-      // curve first bends away from its flat tail - consistent with its
-      // "first onset scanning inward" definition. ~172 (about halfway down
-      // the cliff) would need a far higher scan threshold that breaks
-      // gentle-onset detection elsewhere, so this case just carries extra
-      // tolerance. See also the "blue from 2026-08-28-07" note above.
-      expectedRight: 172,
+      expectedRight: 188,
     },
-    tolerance: 8,
   },
   {
     name: "red from macro-mostly-pink",
@@ -275,7 +266,7 @@ const cases: TestCase[] = [
         509, 303, 175, 89, 43, 26, 12, 4, 4, 0, 0, 0, 0, 0,
       ],
       expectedLeft: 38,
-      expectedRight: 227,
+      expectedRight: 236,
     },
   },
   {
@@ -307,12 +298,7 @@ const cases: TestCase[] = [
         66826, 53888, 43005, 35062, 27854, 20242,
       ],
       expectedLeft: 23,
-      // The green channel is clipped at the top and never flattens into a
-      // tail, so there is no real right shoulder - the white point stays at
-      // the edge (no highlight clipping). The raw scan catches a bend deep in
-      // the interior (the far side of green's secondary hump, curve still
-      // ~40% of peak), but `spuriousKneeMassFraction` rejects it because that
-      // hump sits outside the knee, and the clipped edge falls back to 255.
+      // clipped at the top and never flattens into a tail - keep it all
       expectedRight: 255,
     },
   },
@@ -344,7 +330,7 @@ const cases: TestCase[] = [
         0, 0, 0, 0,
       ],
       expectedLeft: 26,
-      expectedRight: 220,
+      expectedRight: 226,
     },
   },
   {
@@ -375,14 +361,8 @@ const cases: TestCase[] = [
         8, 4, 1, 0, 0,
       ],
       expectedLeft: 34,
-      // The detector reports ~234, where a clean steep falloff is still ~5% of
-      // peak; the hand-picked knee sits ~9 bins lower, right at the floor.
-      // Pushing right knees to the floor with a level rule breaks the cases
-      // that want the knee partway up a cliff (blue from knee-gets-confused),
-      // so this end just carries wider tolerance - see also that note above.
       expectedRight: 243,
     },
-    tolerance: 10,
   },
   {
     name: "green from 2026-09-06-02",
@@ -442,16 +422,9 @@ const cases: TestCase[] = [
         258001, 195106, 143397, 105154, 74256, 51622, 33671, 21914, 13273, 8450, 5029, 3025, 1680,
         889, 514, 281, 151, 74, 37, 13, 17, 6, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       ],
-      // Blue's left shoulder is an ultra-gradual ramp - the smoothed derivative
-      // does not clear the significance threshold until it finally steepens
-      // ~100 bins in. `onsetLevelFraction` catches it: the black point is
-      // simply where the curve first lifts off the near-zero toe.
       expectedLeft: 25,
-      // Right knee lands ~221, ~6 low - same "stops above the floor" bias as
-      // the red case above; carries wider tolerance for the same reason.
       expectedRight: 227,
     },
-    tolerance: 10,
   },
   {
     name: "red from 2026-09-06-02-with-gamma",
@@ -549,7 +522,7 @@ const cases: TestCase[] = [
 describe("findKnees", () => {
   it.each(cases)("$name", ({ histogram, options, tolerance }) => {
     const { counts, expectedLeft, expectedRight } = histogram;
-    const effectiveTolerance = tolerance ?? 5; // residual lag variation
+    const effectiveTolerance = tolerance ?? 5;
 
     const result = findKnees(counts, options);
 

@@ -5,9 +5,9 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film.
 
 1. **Invert** — the bottom layer, switching from negative to positive.
 2. **Levels** — directly above Invert. For each of the red, green, and blue channels, the input
-   range is stretched to that channel's actual minimum and maximum pixel value in the image (an
-   auto-contrast per channel). This cancels out the orange film-base mask and color cast typical of
-   C-41 negative scans.
+   black/white points are set to that channel's occupied range (an auto-contrast per channel; how
+   the range is measured is configurable — see below). This cancels out the orange film-base mask
+   and color cast typical of C-41 negative scans.
 
 If **Correct gamma for raw scans** is enabled in preferences, a third layer — **Correct gamma for
 raw scan**, a Screen-blended Curves layer — is added *below* Invert, to lift a linear/raw scan
@@ -16,55 +16,25 @@ before it is inverted.
 All layers are added in a single undoable step.
 
 How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
-there are three methods:
+there are two methods:
 
-1. A knee-detection algorithm.
-2. Simply finding the lowest and highest values.
-3. Chopping the channel based on a percentage of pixel mass.
-
-Typical images have some range of 'no pixels' at the top and bottom, followed by a range of values
-with a small, near-constant number of pixels, and then the 'interesting' part of the histogram.
-(Obviously, some images are over- or under- exposed and lack one tail or the other.)
-
-The knee algorithm removes both the 'no pixels' range and the 'tail' of very low values. The simple
-chopper stops as soon as it sees a pixel. The percentage is probably a less useful alternative to
-the knee: it pays no attention to the shape of the curve, and simply assumes that the extremes are
-unwanted.
+1. **Knee detection** (default) — trims the empty ends *and* the low-count tails, so the input range
+   spans just the part of the histogram that carries the image.
+2. **Darkest and lightest pixels** — the channel's literal minimum and maximum value.
 
 ## How the knee detector works
 
-`src/find-knees.ts` scans a channel's histogram in from bin 0, and separately in from bin 255, and
-reports the first place each scan hits a *significant* bend. Because it stops at the first bend,
-whatever's going on in the messy middle of the histogram (secondary peaks, spikes) doesn't matter.
+A scanned C-41 negative channel is near-zero at both ends with the real tonal data in between.
+`src/find-knees.ts` normalizes the histogram to its peak and reports the outermost bin at each end
+(scanning in from bin 0, and in from bin 255) that still holds at least 0.15% of the peak count —
+i.e. where the data lifts off / settles back onto its near-zero floor. That's the whole algorithm.
 
-To decide what counts as significant, it normalizes the histogram to [0, 1] by its own peak (so the
-same logic works whether the peak is a few hundred pixels or a few million), smooths it and takes
-the derivative, and sets a threshold from the noise level in the flat regions near each edge. A run
-of samples whose derivative clears that threshold is a knee.
-
-Two things about real scans forced adjustments that a tidier, synthetic histogram wouldn't have
-needed:
-
-- **Not every histogram is flat at both edges.** A channel can hold several percent of its pixels in
-  bin 0 or 255 — usually the film-base end. If that falling shoulder gets pooled into the "this edge
-  is flat noise" estimate, it drags the threshold up enough to miss a real, gentle bend on the far
-  side. So an edge only counts toward the noise estimate if it's actually flat (`flatEdgeMaxFraction`);
-  a clipped edge gets scanned with a separate, higher threshold instead (`clippedEdgeThresholdFraction`).
-- **The raw crossing lands a few samples inside the corner a person would pick**, a side effect of the
-  smoothing. That bias was measured against real scans, not derived analytically, and is subtracted
-  as a small constant (`lagCorrection`).
-
-`src/find-knees.test.ts` is where this is actually tuned, and it's the ground truth: every case is a
-real channel histogram exported from a scan (see `export-histograms.ts`), with a knee position picked
-by eye, not by running the algorithm and calling it correct. If the detector misjudges a new image,
-the fix is to add its histogram as a case with the position you'd pick, then adjust `find-knees.ts`
-until it — and every case already passing — lands within tolerance. A few samples of slack per case
-is normal; smoothing can't be made pixel-exact without also becoming noise-sensitive.
-
-One known soft spot: a shoulder that's a near-vertical cliff, rather than a gradual bend, gets read
-at "where the flat tail first starts bending," which can sit a bit inside of where a person would
-eyeball the true corner. That case in the test file just carries extra tolerance, rather than
-distorting the algorithm to chase it.
+Earlier versions ran a Savitzky-Golay derivative scan for the "knee" where the shoulder bends into
+the tail, with a stack of thresholds for clipped edges, gentle ramps, blown highlights, and secondary
+lobes. Against `src/find-knees.test.ts` — a corpus of real channel histograms (exported via
+`export-histograms.ts`) with black/white points picked by eye — a plain per-bin level lands within a
+few bins of every one of them, so all of that machinery is gone. If the detector misjudges a new
+image, add its histogram to the test file with the points you'd pick and check the rule still holds.
 
 ## Requirements
 

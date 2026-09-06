@@ -1,7 +1,7 @@
 import { entrypoints } from "uxp";
 import { action, app, imaging } from "adobe:photoshop";
 import { getPreferences, openC41Preferences } from "./preferences";
-import { getLayerThresholdsFromHistograms, getLayerLimitsFromKnees } from "./histogram";
+import { getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./export-histograms";
 
 console.log("[c41] plugin script evaluated");
@@ -126,10 +126,6 @@ async function addLevelsAndInvert() {
 
     let limits: AllLimitValues;
     switch (prefs.detectionMethod) {
-      case "threshold":
-        limits = await getLayerThresholdsFromHistograms(prefs.threshold);
-        console.log("[c41] addC41AdjustmentLayers: using threshold", prefs.threshold, "limits:", limits);
-        break;
       case "knee detection":
         limits = await getLayerLimitsFromKnees();
         console.log("[c41] addC41AdjustmentLayers: using knee detection, limits:", limits);
@@ -137,7 +133,7 @@ async function addLevelsAndInvert() {
       case "extreme":
       default:
         limits = await getChannelLimitValues();
-        console.log("[c41] addC41AdjustmentLayers: using full range limits:", limits);
+        console.log("[c41] addC41AdjustmentLayers: using darkest/lightest pixels, limits:", limits);
         break;
     }
 
