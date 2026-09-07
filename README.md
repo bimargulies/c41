@@ -1,7 +1,8 @@
 # c41
 
-A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film. Its one command,
-**Add C41 Adjustment Layers**, adds these adjustment layers to the active document:
+A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film. Its main command,
+**Add C41 Adjustment Layers**, adds two adjustment layers to the active document in one undoable
+step:
 
 1. **Invert** — the bottom layer, switching from negative to positive.
 2. **Levels** — directly above Invert. For each of the red, green, and blue channels, the input
@@ -9,28 +10,37 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film.
    the range is measured is configurable — see below). This cancels out the orange film-base mask
    and color cast typical of C-41 negative scans.
 
-If **Correct gamma for raw scans** is enabled in preferences, the scan is first color-converted from
-a linear source profile to the working RGB space — Assign Profile (to the ICC profile named in
-preferences) followed by Convert to Profile — which applies the exact linear→working transfer curve
-before the inversion. This rewrites the base image's pixels, so it requires a 16- or 32-bit
-document; the command aborts with a message otherwise.
+## Correct Raw Scan Gamma
 
-The plugin bundles a linear sRGB profile for this. Run **Install linear scan profile** once (it
-copies the profile into `~/Library/ColorSync/Profiles` on macOS), restart Photoshop, and the
-default **Linear scan profile** preference (`sRGB-elle-V4-g10.icc`) will resolve. On other
-platforms install the file — `sRGB-elle-V4-g10.icc` in the plugin folder — into your system
-colour-profile directory by hand.
+This command is needed if you are creating raw scans with VueScan or Silverfast. Those scans have a
+gamma of 1.0. These programs will not necessarily tag the TIFF with an ICC profile that accurately
+describes the contents as 'linear gamma'.
 
-Everything is done in a single undoable step.
+If you are making linear scans, run this command once **before** Add C41 Adjustment Layers. It
+assigns an ICC profile with a linear gamma to the image, and then converts the image to the working
+space color profile. This rewrites the base image's pixels, so it needs a 16- or 32-bit document
+(Image › Mode); it aborts with a message otherwise. Skip this command entirely for scans that are
+already gamma-encoded.
 
-How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
-there are two methods:
+You specify the linear gamma profile in the preferences. The plugin includes Elle Stone's linear
+gamma sRGB profile, and this profile is the default selection in the preferences. There is a command
+to help you install that ICC profile.
 
-1. **Knee detection** (default) — trims the empty ends *and* the low-count tails, so the input range
+The installation command is **Install linear scan profile** — it prompts for your colour-profile
+folder (`~/Library/ColorSync/Profiles` on macOS; ⌘⇧G to reach it) and copies the profile there.
+Restart Photoshop and the default **Linear scan profile** preference (`sRGB-elle-V4-g10.icc`) will
+work.
+
+## Levels detection
+
+How each channel's black/white points are chosen is configurable in preferences; there are two
+methods:
+
+1. **Knee detection** (default) — trims the empty ends _and_ the low-count tails, so the input range
    spans just the part of the histogram that carries the image.
 2. **Darkest and lightest pixels** — the channel's literal minimum and maximum value.
 
-## How the knee detector works
+### How the knee detector works
 
 A scanned C-41 negative channel is near-zero at both ends with the real tonal data in between.
 `src/find-knees.ts` normalizes the histogram to its peak and reports the outermost bin at each end
@@ -38,11 +48,12 @@ A scanned C-41 negative channel is near-zero at both ends with the real tonal da
 i.e. where the data lifts off / settles back onto its near-zero floor. That's the whole algorithm.
 
 Earlier versions ran a Savitzky-Golay derivative scan for the "knee" where the shoulder bends into
-the tail, with a stack of thresholds for clipped edges, gentle ramps, blown highlights, and secondary
-lobes. Against `src/find-knees.test.ts` — a corpus of real channel histograms (exported via
-`export-histograms.ts`) with black/white points picked by eye — a plain per-bin level lands within a
-few bins of every one of them, so all of that machinery is gone. If the detector misjudges a new
-image, add its histogram to the test file with the points you'd pick and check the rule still holds.
+the tail, with a stack of thresholds for clipped edges, gentle ramps, blown highlights, and
+secondary lobes. Against `src/find-knees.test.ts` — a corpus of real channel histograms (exported
+via `export-histograms.ts`) with black/white points picked by eye — a plain per-bin level lands
+within a few bins of every one of them, so all of that machinery is gone. If the detector misjudges
+a new image, add its histogram to the test file with the points you'd pick and check that this rule
+still holds.
 
 ## Requirements
 
@@ -89,11 +100,11 @@ pnpm run package        # writes ./c41.ccx
 
 Then double-click `c41.ccx` to install it via the Creative Cloud desktop app.
 
-Each [release](../../releases) also attaches the `.ccx` plus `install-ccx.sh`. Download both into one
-folder and run `bash install-ccx.sh` (also `--remove` / `--list`) — a standalone macOS installer that
-drives Adobe's bundled `UnifiedPluginInstallerAgent`, no repo checkout needed. For local development,
-`scripts/install-macos.sh` does build + package + install in one step. Either way you must be signed
-into the Creative Cloud desktop app (5.7+) with an entitled Adobe ID.
+Each [release](../../releases) also attaches the `.ccx` plus `install-ccx.sh`. Download both into
+one folder and run `bash install-ccx.sh` (also `--remove` / `--list`) — a standalone macOS installer
+that drives Adobe's bundled `UnifiedPluginInstallerAgent`, no repo checkout needed. For local
+development, `scripts/install-macos.sh` does build + package + install in one step. Either way you
+must be signed into the Creative Cloud desktop app (5.7+) with an entitled Adobe ID.
 
 Packaging from the UXP Developer Tool (`...` menu → **Package**) also works.
 
@@ -119,8 +130,8 @@ The plugin is [BSD 3-Clause](./LICENSE).
 
 The bundled linear ICC profile, **`sRGB-elle-V4-g10.icc`**, is from
 [Elle Stone's Well-Behaved ICC Profiles](https://github.com/ellelstone/elles_icc_profiles)
-(Copyright 2016, Elle Stone, <http://ninedegreesbelow.com/>) and is included **unmodified** under the
-**Creative Commons Attribution-ShareAlike 3.0 Unported** license
+(Copyright 2016, Elle Stone, <http://ninedegreesbelow.com/>) and is included **unmodified** under
+the **Creative Commons Attribution-ShareAlike 3.0 Unported** license
 (<https://creativecommons.org/licenses/by-sa/3.0/legalcode>). Full text and attribution notice:
 [`public/licenses/`](./public/licenses/). CC BY-SA applies to that profile file (and any modified
 profile derived from it), not to the rest of the plugin — bundling it as-is is a mere aggregation.

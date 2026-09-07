@@ -31,6 +31,13 @@ const manifest: UXP_Manifest = {
 		},
 		{
 			type: 'command',
+			id: 'correctRawScanGamma',
+			label: {
+				default: 'Correct Raw Scan Gamma',
+			},
+		},
+		{
+			type: 'command',
 			id: 'exportChannelHistograms',
 			label: {
 				default: 'Export Channel Histograms...',
