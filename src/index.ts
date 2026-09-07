@@ -97,45 +97,48 @@ async function exportChannelHistograms() {
   }
 }
 
+const PROFILES_FOLDER_TOKEN = "c41.colorSyncProfilesFolder";
+
 // Copy the bundled linear profile (public/sRGB-elle-V4-g10.icc) into the user's
-// ColorSync profile folder so Photoshop can find it by name. Photoshop only
-// scans that folder at launch, hence the "restart" in the message.
+// ColorSync profiles folder so Photoshop can find it by name. UXP can't reach
+// ~/Library directly, so the user picks the folder once (its access grant is
+// remembered). Photoshop only scans it at launch, hence the "restart".
 async function installLinearProfile() {
   const fs = storage.localFileSystem;
   const src = await (await fs.getPluginFolder()).getEntry(BUNDLED_LINEAR_PROFILE);
   type Folder = Parameters<typeof src.copyTo>[0];
 
-  const manualInstructions =
-    `The profile file is here:\n${src.nativePath}\n\n` +
-    `Copy it into your system colour-profile folder (~/Library/ColorSync/Profiles on macOS), ` +
-    `restart Photoshop, then set "Linear scan profile" in C41 Preferences to "${BUNDLED_LINEAR_PROFILE}".`;
-
-  // UXP has no os.homedir(); derive ~ from the (always user-scoped) data folder.
-  const home = (await fs.getDataFolder()).nativePath.match(/^(\/Users\/[^/]+)\//)?.[1];
-  if (!home) {
-    await app.showAlert(`Automatic install is macOS only.\n\n${manualInstructions}`);
-    return;
+  let dest: Folder | null = null;
+  const saved = localStorage.getItem(PROFILES_FOLDER_TOKEN);
+  if (saved) {
+    dest = (await fs.getEntryForPersistentToken(saved).catch(() => null)) as Folder | null;
   }
 
-  // ~/Library exists but ~/Library/ColorSync[/Profiles] often doesn't - walk
-  // down from ~/Library, creating each level.
-  const subfolder = async (parent: Folder, name: string): Promise<Folder> =>
-    (((await parent.getEntry(name).catch(() => null)) as Folder | null) ??
-      ((await parent.createFolder(name)) as Folder));
+  if (!dest) {
+    await app.showAlert(
+      `Pick your colour-profile folder in the next dialog.\n\n` +
+        `On macOS: press ⌘⇧G and enter  ~/Library/ColorSync/Profiles`,
+    );
+    dest = (await fs.getFolder()) as Folder | null;
+    if (!dest) return; // cancelled
+    localStorage.setItem(PROFILES_FOLDER_TOKEN, await fs.createPersistentToken(dest));
+  }
 
   try {
-    const library = (await fs.getEntryWithUrl(`file:${home}/Library`)) as Folder;
-    const profiles = await subfolder(await subfolder(library, "ColorSync"), "Profiles");
-    await src.copyTo(profiles, { overwrite: true });
+    await src.copyTo(dest, { overwrite: true });
   } catch (err) {
     console.error("[c41] installLinearProfile: failed", err);
-    await app.showAlert(`Couldn't install the profile automatically (${err}).\n\n${manualInstructions}`);
+    localStorage.removeItem(PROFILES_FOLDER_TOKEN);
+    await app.showAlert(
+      `Couldn't copy the profile there (${err}).\n\n` +
+        `Do it by hand: put\n${src.nativePath}\ninto ~/Library/ColorSync/Profiles, then restart Photoshop.`,
+    );
     return;
   }
 
   await app.showAlert(
-    `Installed "${BUNDLED_LINEAR_PROFILE}" to ~/Library/ColorSync/Profiles.\n\n` +
-      `Quit and reopen Photoshop for it to become available, then use "Correct gamma for raw scans".`,
+    `Installed "${BUNDLED_LINEAR_PROFILE}" to:\n${dest.nativePath}\n\n` +
+      `Quit and reopen Photoshop, then use "Correct gamma for raw scans".`,
   );
 }
 
