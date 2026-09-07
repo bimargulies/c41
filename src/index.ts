@@ -117,11 +117,15 @@ async function installLinearProfile() {
     return;
   }
 
+  // ~/Library exists but ~/Library/ColorSync[/Profiles] often doesn't - walk
+  // down from ~/Library, creating each level.
+  const subfolder = async (parent: Folder, name: string): Promise<Folder> =>
+    (((await parent.getEntry(name).catch(() => null)) as Folder | null) ??
+      ((await parent.createFolder(name)) as Folder));
+
   try {
-    const colorSync = (await fs.getEntryWithUrl(`file:${home}/Library/ColorSync`)) as Folder;
-    const profiles =
-      ((await colorSync.getEntry("Profiles").catch(() => null)) as Folder | null) ??
-      ((await colorSync.createFolder("Profiles")) as Folder);
+    const library = (await fs.getEntryWithUrl(`file:${home}/Library`)) as Folder;
+    const profiles = await subfolder(await subfolder(library, "ColorSync"), "Profiles");
     await src.copyTo(profiles, { overwrite: true });
   } catch (err) {
     console.error("[c41] installLinearProfile: failed", err);
