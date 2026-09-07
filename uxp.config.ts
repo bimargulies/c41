@@ -3,7 +3,7 @@ import type { UXP_Config, UXP_Manifest } from 'vite-uxp-plugin';
 const manifest: UXP_Manifest = {
 	id: 'b7e22b3b',
 	name: 'C41 tools',
-	version: '2.0.0',
+	version: '2.1.0',
 	main: 'index.js',
 	manifestVersion: 5,
 	host: [
