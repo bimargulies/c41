@@ -1,0 +1,41 @@
+sRGB-elle-V4-g10.icc
+====================
+
+A linear-gamma (gamma 1.0) ICC v4 RGB profile with sRGB primaries and the
+D65 white point. C41 tools bundles it as the linear source space for the
+"Correct gamma for raw scans" option (Assign Profile, then Convert to
+Profile to the working RGB space).
+
+The file is included UNMODIFIED, exactly as published.
+
+Attribution
+-----------
+
+  Copyright 2016, Elle Stone (http://ninedegreesbelow.com/)
+  From "Elle Stone's Well-Behaved ICC Profiles and Code":
+    https://github.com/ellelstone/elles_icc_profiles
+    http://ninedegreesbelow.com/photography/lcms-make-icc-profiles.html
+
+The same notice is recorded in the profile's own copyright tag.
+
+License
+-------
+
+Elle Stone's ICC profiles are released under the Creative Commons
+Attribution-ShareAlike 3.0 Unported license (CC BY-SA 3.0). The full text
+is in CC-BY-SA-3.0.txt in this folder, and online at:
+
+  https://creativecommons.org/licenses/by-sa/3.0/legalcode
+
+ShareAlike note: this license applies to the profile file itself and to
+any adapted (modified) profile derived from it, which would have to be
+released under CC BY-SA 3.0 (or a compatible license). It does not extend
+to the rest of C41 tools, which is BSD-3-Clause — bundling the unmodified
+profile alongside is a mere aggregation.
+
+Disclaimer of warranties
+------------------------
+
+The profile is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the license for details.

@@ -1,6 +1,6 @@
-import { entrypoints } from "uxp";
-import { action, app, imaging } from "adobe:photoshop";
-import { getPreferences, openC41Preferences } from "./preferences";
+import { entrypoints, storage } from "uxp";
+import { action, app, constants, imaging } from "adobe:photoshop";
+import { BUNDLED_LINEAR_PROFILE, getPreferences, openC41Preferences } from "./preferences";
 import { getLayerLimitsFromKnees } from "./histogram";
 import { writeChannelHistogramsFile } from "./export-histograms";
 
@@ -72,6 +72,10 @@ async function getChannelLimitValues(): Promise<AllLimitValues> {
   }
 }
 
+// Raised for a condition the user can fix (wrong bit depth, missing profile
+// name); shown to them verbatim instead of just logged.
+class UserError extends Error {}
+
 async function addC41AdjustmentLayers() {
   console.log("[c41] addC41AdjustmentLayers: start");
   try {
@@ -79,6 +83,7 @@ async function addC41AdjustmentLayers() {
     console.log("[c41] addC41AdjustmentLayers: done");
   } catch (err) {
     console.error("[c41] addC41AdjustmentLayers: failed", err);
+    await app.showAlert(err instanceof UserError ? err.message : `C41 tools: ${err}`);
   }
 }
 
@@ -92,25 +97,98 @@ async function exportChannelHistograms() {
   }
 }
 
+const PROFILES_FOLDER_TOKEN = "c41.colorSyncProfilesFolder";
+
+// Copy the bundled linear profile (public/sRGB-elle-V4-g10.icc) into the user's
+// ColorSync profiles folder so Photoshop can find it by name. UXP can't reach
+// ~/Library directly, so the user picks the folder once (its access grant is
+// remembered). Photoshop only scans it at launch, hence the "restart".
+async function installLinearProfile() {
+  const fs = storage.localFileSystem;
+  const src = await (await fs.getPluginFolder()).getEntry(BUNDLED_LINEAR_PROFILE);
+  type Folder = Parameters<typeof src.copyTo>[0];
+
+  let dest: Folder | null = null;
+  const saved = localStorage.getItem(PROFILES_FOLDER_TOKEN);
+  if (saved) {
+    dest = (await fs.getEntryForPersistentToken(saved).catch(() => null)) as Folder | null;
+  }
+
+  if (!dest) {
+    await app.showAlert(
+      `Pick your colour-profile folder in the next dialog.\n\n` +
+        `On macOS: press ⌘⇧G and enter  ~/Library/ColorSync/Profiles`,
+    );
+    dest = (await fs.getFolder()) as Folder | null;
+    if (!dest) return; // cancelled
+    localStorage.setItem(PROFILES_FOLDER_TOKEN, await fs.createPersistentToken(dest));
+  }
+
+  try {
+    await src.copyTo(dest, { overwrite: true });
+  } catch (err) {
+    console.error("[c41] installLinearProfile: failed", err);
+    localStorage.removeItem(PROFILES_FOLDER_TOKEN);
+    await app.showAlert(
+      `Couldn't copy the profile there (${err}).\n\n` +
+        `Do it by hand: put\n${src.nativePath}\ninto ~/Library/ColorSync/Profiles, then restart Photoshop.`,
+    );
+    return;
+  }
+
+  await app.showAlert(
+    `Installed "${BUNDLED_LINEAR_PROFILE}" to:\n${dest.nativePath}\n\n` +
+      `Quit and reopen Photoshop, then use "Correct gamma for raw scans".`,
+  );
+}
+
+// Turn a linear/raw scan into the working space before inversion: tag the
+// document with the linear capture profile, then Convert to Profile to the
+// working RGB space, which applies the exact linear -> working transfer curve
+// (unlike the old Screen-blended Curves layer, which only approximated it).
+// This rewrites the base image's pixels, so it needs 16- or 32-bit precision.
+async function correctRawScanGamma(linearProfileName: string) {
+  const doc = app.activeDocument;
+  doc.colorProfileName = linearProfileName;
+  if (doc.colorProfileType === constants.ColorProfileType.NONE) {
+    throw new UserError(
+      linearProfileName === BUNDLED_LINEAR_PROFILE
+        ? `The linear scan profile isn't installed yet. Run "Install linear scan profile" ` +
+          `(Plugins › C41 tools), restart Photoshop, then try again.`
+        : `"${linearProfileName}" isn't an installed ICC profile - check the name in C41 Preferences.`,
+    );
+  }
+  try {
+    await doc.convertProfile("Working RGB", constants.Intent.RELATIVECOLORIMETRIC, true);
+  } catch (err) {
+    throw new UserError(
+      `Couldn't convert from "${linearProfileName}" to the working space (${err}).`,
+    );
+  }
+}
+
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
+
+  if (prefs.correctGammaForRawScans) {
+    const bits = app.activeDocument.bitsPerChannel;
+    if (bits !== constants.BitsPerChannelType.SIXTEEN && bits !== constants.BitsPerChannelType.THIRTYTWO) {
+      throw new UserError(
+        '"Correct gamma for raw scans" rewrites pixel data and needs a 16- or 32-bit document ' +
+          "(Image › Mode). No layers were added.",
+      );
+    }
+    if (!prefs.linearProfileName.trim()) {
+      throw new UserError(
+        'Set the linear scan profile name in C41 Preferences to use "Correct gamma for raw scans". ' +
+          "No layers were added.",
+      );
+    }
+  }
+
   await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
-    // Each `make adjustmentLayer` stacks above the previously active layer, so
-    // creating this first puts it below Invert - a Screen-blended Curves layer
-    // that lifts a linear/raw scan before it is inverted.
     if (prefs.correctGammaForRawScans) {
-      await batchPlayModifying({
-        _obj: "make",
-        _target: [{ _ref: "adjustmentLayer" }],
-        using: {
-          _obj: "adjustmentLayer",
-          name: "Correct gamma for raw scan",
-          mode: { _enum: "blendMode", _value: "screen" },
-          type: {
-            _obj: "curves",
-          },
-        },
-      });
+      await correctRawScanGamma(prefs.linearProfileName.trim());
     }
 
     await batchPlayModifying({
@@ -184,5 +262,6 @@ entrypoints.setup({
     addC41AdjustmentLayers: addC41AdjustmentLayers,
     exportChannelHistograms: exportChannelHistograms,
     openC41Preferences: openC41Preferences,
+    installLinearProfile: installLinearProfile,
   },
 } as unknown as Parameters<typeof entrypoints.setup>[0]);

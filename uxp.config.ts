@@ -43,6 +43,13 @@ const manifest: UXP_Manifest = {
 				default: 'Preferences...',
 			},
 		},
+		{
+			type: 'command',
+			id: 'installLinearProfile',
+			label: {
+				default: 'Install linear scan profile',
+			},
+		},
 	],
 	requiredPermissions: {
 		localFileSystem: 'request',
