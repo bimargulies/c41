@@ -13,7 +13,7 @@ export default defineConfig({
 			// UXP supplies these at runtime - never bundle them. `adobe:photoshop`
 			// is rewritten to a bare `photoshop` require in the CJS output below,
 			// so source can keep using the explicit `adobe:` specifier.
-			external: ['uxp', 'os', 'photoshop', 'adobe:photoshop'],
+			external: ['uxp', 'photoshop', 'adobe:photoshop'],
 			input: 'src/index.ts',
 			output: {
 				format: 'cjs',
