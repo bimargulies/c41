@@ -10,9 +10,9 @@ type ActionDescriptor = Parameters<typeof action.batchPlay>[0][number];
 
 // Run `fn` as a single undoable step on the active document. suspendHistory
 // (a thin wrapper over core.executeAsModal) coalesces every change made in the
-// callback into one named history state, so both adjustment layers are added
-// and removed by a single undo. A throw inside the callback can surface as an
-// opaque wrapper that loses the original error, so capture and rethrow it.
+// callback into one named history state. A throw inside the callback can
+// surface as an opaque wrapper that loses the original error, so capture and
+// rethrow it.
 async function asSingleHistoryStep(name: string, fn: () => Promise<void>): Promise<void> {
   let error: unknown;
   await app.activeDocument.suspendHistory(async () => {
@@ -138,59 +138,61 @@ async function installLinearProfile() {
 
   await app.showAlert(
     `Installed "${BUNDLED_LINEAR_PROFILE}" to:\n${dest.nativePath}\n\n` +
-      `Quit and reopen Photoshop, then use "Correct gamma for raw scans".`,
+      `Quit and reopen Photoshop, then use "Correct Raw Scan Gamma".`,
   );
 }
 
-// Turn a linear/raw scan into the working space before inversion: tag the
-// document with the linear capture profile, then Convert to Profile to the
-// working RGB space, which applies the exact linear -> working transfer curve
-// (unlike the old Screen-blended Curves layer, which only approximated it).
-// This rewrites the base image's pixels, so it needs 16- or 32-bit precision.
-async function correctRawScanGamma(linearProfileName: string) {
-  const doc = app.activeDocument;
-  doc.colorProfileName = linearProfileName;
-  if (doc.colorProfileType === constants.ColorProfileType.NONE) {
-    throw new UserError(
-      linearProfileName === BUNDLED_LINEAR_PROFILE
-        ? `The linear scan profile isn't installed yet. Run "Install linear scan profile" ` +
-          `(Plugins › C41 tools), restart Photoshop, then try again.`
-        : `"${linearProfileName}" isn't an installed ICC profile - check the name in C41 Preferences.`,
-    );
-  }
+// Convert a linear/raw scan into the working space: tag the document with the
+// linear capture profile, then Convert to Profile to working RGB, which applies
+// the exact linear -> working transfer curve. Rewrites the base image's pixels,
+// so it needs 16- or 32-bit precision - a separate step from adding the levels
+// and invert layers, run once on the raw scan first.
+async function correctRawScanGamma() {
+  console.log("[c41] correctRawScanGamma: start");
   try {
-    await doc.convertProfile("Working RGB", constants.Intent.RELATIVECOLORIMETRIC, true);
+    const doc = app.activeDocument;
+    const profile = getPreferences().linearProfileName.trim();
+
+    if (
+      doc.bitsPerChannel !== constants.BitsPerChannelType.SIXTEEN &&
+      doc.bitsPerChannel !== constants.BitsPerChannelType.THIRTYTWO
+    ) {
+      throw new UserError(
+        "Correcting raw scan gamma rewrites pixel data and needs a 16- or 32-bit document " +
+          "(Image › Mode).",
+      );
+    }
+    if (!profile) {
+      throw new UserError('Set the linear scan profile name in C41 Preferences first.');
+    }
+
+    await asSingleHistoryStep("Correct Raw Scan Gamma", async () => {
+      doc.colorProfileName = profile;
+      if (doc.colorProfileType === constants.ColorProfileType.NONE) {
+        throw new UserError(
+          profile === BUNDLED_LINEAR_PROFILE
+            ? `The linear scan profile isn't installed yet. Run "Install linear scan profile" ` +
+              `(Plugins › C41 tools), restart Photoshop, then try again.`
+            : `"${profile}" isn't an installed ICC profile - check the name in C41 Preferences.`,
+        );
+      }
+      try {
+        await doc.convertProfile("Working RGB", constants.Intent.RELATIVECOLORIMETRIC, true);
+      } catch (err) {
+        throw new UserError(`Couldn't convert from "${profile}" to the working space (${err}).`);
+      }
+    });
+    console.log("[c41] correctRawScanGamma: done");
   } catch (err) {
-    throw new UserError(
-      `Couldn't convert from "${linearProfileName}" to the working space (${err}).`,
-    );
+    console.error("[c41] correctRawScanGamma: failed", err);
+    await app.showAlert(err instanceof UserError ? err.message : `C41 tools: ${err}`);
   }
 }
 
 async function addLevelsAndInvert() {
   const prefs = getPreferences();
 
-  if (prefs.correctGammaForRawScans) {
-    const bits = app.activeDocument.bitsPerChannel;
-    if (bits !== constants.BitsPerChannelType.SIXTEEN && bits !== constants.BitsPerChannelType.THIRTYTWO) {
-      throw new UserError(
-        '"Correct gamma for raw scans" rewrites pixel data and needs a 16- or 32-bit document ' +
-          "(Image › Mode). No layers were added.",
-      );
-    }
-    if (!prefs.linearProfileName.trim()) {
-      throw new UserError(
-        'Set the linear scan profile name in C41 Preferences to use "Correct gamma for raw scans". ' +
-          "No layers were added.",
-      );
-    }
-  }
-
   await asSingleHistoryStep("Add C41 Adjustment Layers", async () => {
-    if (prefs.correctGammaForRawScans) {
-      await correctRawScanGamma(prefs.linearProfileName.trim());
-    }
-
     await batchPlayModifying({
       _obj: "make",
       _target: [{ _ref: "adjustmentLayer" }],
@@ -260,6 +262,7 @@ async function addLevelsAndInvert() {
 entrypoints.setup({
   commands: {
     addC41AdjustmentLayers: addC41AdjustmentLayers,
+    correctRawScanGamma: correctRawScanGamma,
     exportChannelHistograms: exportChannelHistograms,
     openC41Preferences: openC41Preferences,
     installLinearProfile: installLinearProfile,

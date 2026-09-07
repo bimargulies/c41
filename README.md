@@ -1,7 +1,8 @@
 # c41
 
-A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film. Its one command,
-**Add C41 Adjustment Layers**, adds these adjustment layers to the active document:
+A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film. Its main command,
+**Add C41 Adjustment Layers**, adds two adjustment layers to the active document in one undoable
+step:
 
 1. **Invert** — the bottom layer, switching from negative to positive.
 2. **Levels** — directly above Invert. For each of the red, green, and blue channels, the input
@@ -9,28 +10,29 @@ A Photoshop UXP plugin ("C41 tools") for correcting scanned color negative film.
    the range is measured is configurable — see below). This cancels out the orange film-base mask
    and color cast typical of C-41 negative scans.
 
-If **Correct gamma for raw scans** is enabled in preferences, the scan is first color-converted from
-a linear source profile to the working RGB space — Assign Profile (to the ICC profile named in
-preferences) followed by Convert to Profile — which applies the exact linear→working transfer curve
-before the inversion. This rewrites the base image's pixels, so it requires a 16- or 32-bit
-document; the command aborts with a message otherwise.
+## Correct Raw Scan Gamma
 
-The plugin bundles a linear sRGB profile for this. Run **Install linear scan profile** once (it
-copies the profile into `~/Library/ColorSync/Profiles` on macOS), restart Photoshop, and the
-default **Linear scan profile** preference (`sRGB-elle-V4-g10.icc`) will resolve. On other
-platforms install the file — `sRGB-elle-V4-g10.icc` in the plugin folder — into your system
-colour-profile directory by hand.
+A separate command, run once on a **linear** scan **before** Add C41 Adjustment Layers. It
+color-converts the image to the working RGB space — Assign Profile (to the ICC profile named in
+preferences) then Convert to Profile — which applies the exact linear→working transfer curve.
+This rewrites the base image's pixels, so it needs a 16- or 32-bit document (Image › Mode); it
+aborts with a message otherwise. Skip it entirely for scans that are already gamma-encoded.
 
-Everything is done in a single undoable step.
+The plugin bundles a linear sRGB profile. Run **Install linear scan profile** once — it prompts for
+your colour-profile folder (`~/Library/ColorSync/Profiles` on macOS; ⌘⇧G to reach it), copies the
+profile there, and remembers the folder. Restart Photoshop and the default **Linear scan profile**
+preference (`sRGB-elle-V4-g10.icc`) resolves.
 
-How each channel's "minimum" and "maximum" pixel values are chosen is configurable in preferences;
-there are two methods:
+## Levels detection
+
+How each channel's black/white points are chosen is configurable in preferences; there are two
+methods:
 
 1. **Knee detection** (default) — trims the empty ends *and* the low-count tails, so the input range
    spans just the part of the histogram that carries the image.
 2. **Darkest and lightest pixels** — the channel's literal minimum and maximum value.
 
-## How the knee detector works
+### How the knee detector works
 
 A scanned C-41 negative channel is near-zero at both ends with the real tonal data in between.
 `src/find-knees.ts` normalizes the histogram to its peak and reports the outermost bin at each end
