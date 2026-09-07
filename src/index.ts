@@ -1,5 +1,4 @@
 import { entrypoints, storage } from "uxp";
-import * as os from "os";
 import { action, app, constants, imaging } from "adobe:photoshop";
 import { BUNDLED_LINEAR_PROFILE, getPreferences, openC41Preferences } from "./preferences";
 import { getLayerLimitsFromKnees } from "./histogram";
@@ -102,38 +101,38 @@ async function exportChannelHistograms() {
 // ColorSync profile folder so Photoshop can find it by name. Photoshop only
 // scans that folder at launch, hence the "restart" in the message.
 async function installLinearProfile() {
+  const fs = storage.localFileSystem;
+  const src = await (await fs.getPluginFolder()).getEntry(BUNDLED_LINEAR_PROFILE);
+  type Folder = Parameters<typeof src.copyTo>[0];
+
+  const manualInstructions =
+    `The profile file is here:\n${src.nativePath}\n\n` +
+    `Copy it into your system colour-profile folder (~/Library/ColorSync/Profiles on macOS), ` +
+    `restart Photoshop, then set "Linear scan profile" in C41 Preferences to "${BUNDLED_LINEAR_PROFILE}".`;
+
+  // UXP has no os.homedir(); derive ~ from the (always user-scoped) data folder.
+  const home = (await fs.getDataFolder()).nativePath.match(/^(\/Users\/[^/]+)\//)?.[1];
+  if (!home) {
+    await app.showAlert(`Automatic install is macOS only.\n\n${manualInstructions}`);
+    return;
+  }
+
   try {
-    const fs = storage.localFileSystem;
-    const src = await (await fs.getPluginFolder()).getEntry(BUNDLED_LINEAR_PROFILE);
-
-    if (os.platform() !== "darwin") {
-      await app.showAlert(
-        `Automatic install is macOS only. The profile file is at:\n${src.nativePath}\n\n` +
-          `Install it into your system colour-profile folder, restart Photoshop, then ` +
-          `set "Linear scan profile" in C41 Preferences to "${BUNDLED_LINEAR_PROFILE}".`,
-      );
-      return;
-    }
-
-    type Folder = Parameters<typeof src.copyTo>[0];
-    const colorSync = (await fs.getEntryWithUrl(`file:${os.homedir()}/Library/ColorSync`)) as Folder;
-    const dest =
+    const colorSync = (await fs.getEntryWithUrl(`file:${home}/Library/ColorSync`)) as Folder;
+    const profiles =
       ((await colorSync.getEntry("Profiles").catch(() => null)) as Folder | null) ??
       ((await colorSync.createFolder("Profiles")) as Folder);
-    await src.copyTo(dest, { overwrite: true });
-    await app.showAlert(
-      `Installed "${BUNDLED_LINEAR_PROFILE}" to ~/Library/ColorSync/Profiles.\n\n` +
-        `Quit and reopen Photoshop for it to become available, then use ` +
-        `"Correct gamma for raw scans".`,
-    );
+    await src.copyTo(profiles, { overwrite: true });
   } catch (err) {
     console.error("[c41] installLinearProfile: failed", err);
-    await app.showAlert(
-      `Couldn't install the linear profile automatically (${err}).\n\n` +
-        `Copy it in by hand: the file is in the plugin folder as ` +
-        `"${BUNDLED_LINEAR_PROFILE}"; put it in ~/Library/ColorSync/Profiles, then restart Photoshop.`,
-    );
+    await app.showAlert(`Couldn't install the profile automatically (${err}).\n\n${manualInstructions}`);
+    return;
   }
+
+  await app.showAlert(
+    `Installed "${BUNDLED_LINEAR_PROFILE}" to ~/Library/ColorSync/Profiles.\n\n` +
+      `Quit and reopen Photoshop for it to become available, then use "Correct gamma for raw scans".`,
+  );
 }
 
 // Turn a linear/raw scan into the working space before inversion: tag the
