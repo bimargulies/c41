@@ -1,6 +1,15 @@
 /// <reference types="@adobe-uxp-types/uxp/with-protocol" />
 /// <reference types="@adobe-uxp-types/photoshop/with-protocol" />
 
+// UXP's `os` is a top-level module (`require("os")`), not `require("uxp").os`
+// as @adobe-uxp-types/uxp implies. https://developer.adobe.com/photoshop/uxp/2022/uxp/reference-js/Modules/os/OS/
+declare module 'os' {
+	export function platform(): string;
+	export function homedir(): string;
+	export function release(): string;
+	export function arch(): string;
+}
+
 interface UxpShowModalOptions {
 	title?: string;
 	resize?: 'none' | 'both' | 'horizontal' | 'vertical';

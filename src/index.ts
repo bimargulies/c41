@@ -1,4 +1,5 @@
-import { entrypoints, os, storage } from "uxp";
+import { entrypoints, storage } from "uxp";
+import * as os from "os";
 import { action, app, constants, imaging } from "adobe:photoshop";
 import { BUNDLED_LINEAR_PROFILE, getPreferences, openC41Preferences } from "./preferences";
 import { getLayerLimitsFromKnees } from "./histogram";
